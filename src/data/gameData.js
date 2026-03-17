@@ -1,0 +1,97 @@
+/* GAME DATA */
+const TEAMS = [
+  { id: "mclaren", name: "McLaren", color: "#FF8000", engine: "Mercedes", car: 94 },
+  { id: "ferrari", name: "Ferrari", color: "#DC2626", engine: "Ferrari", car: 93 },
+  { id: "redbull", name: "Red Bull Racing", color: "#3B82F6", engine: "Red Bull Ford", car: 95 },
+  { id: "mercedes", name: "Mercedes", color: "#00D2BE", engine: "Mercedes", car: 91 },
+  { id: "aston", name: "Aston Martin", color: "#22C55E", engine: "Honda", car: 82 },
+  { id: "alpine", name: "Alpine", color: "#60A5FA", engine: "Renault", car: 78 },
+  { id: "williams", name: "Williams", color: "#60A5FA", engine: "Mercedes", car: 80 },
+  { id: "haas", name: "Haas", color: "#F87171", engine: "Ferrari", car: 76 },
+  { id: "audi", name: "Audi", color: "#9CA3AF", engine: "Audi", car: 74 },
+  { id: "racingbulls", name: "Racing Bulls", color: "#818CF8", engine: "Red Bull Ford", car: 79 },
+  { id: "cadillac", name: "Cadillac", color: "#D6D3D1", engine: "Ferrari", car: 70 },
+];
+
+const F1_DRIVERS = [
+  { name: "Lando Norris", age: 26, ovr: 95, pace: 5, consistency: 5, wet: 4, teamId: "mclaren", salary: 35, contractEnd: 2028 },
+  { name: "Oscar Piastri", age: 24, ovr: 92, pace: 5, consistency: 4, wet: 4, teamId: "mclaren", salary: 20, contractEnd: 2027 },
+  { name: "Lewis Hamilton", age: 41, ovr: 90, pace: 4, consistency: 5, wet: 5, teamId: "ferrari", salary: 40, contractEnd: 2027 },
+  { name: "Charles Leclerc", age: 28, ovr: 93, pace: 5, consistency: 4, wet: 4, teamId: "ferrari", salary: 28, contractEnd: 2029 },
+  { name: "Max Verstappen", age: 28, ovr: 97, pace: 5, consistency: 5, wet: 5, teamId: "redbull", salary: 55, contractEnd: 2028 },
+  { name: "Isack Hadjar", age: 21, ovr: 78, pace: 4, consistency: 3, wet: 3, teamId: "redbull", salary: 4, contractEnd: 2027 },
+  { name: "George Russell", age: 28, ovr: 91, pace: 5, consistency: 4, wet: 4, teamId: "mercedes", salary: 20, contractEnd: 2027 },
+  { name: "Kimi Antonelli", age: 19, ovr: 82, pace: 5, consistency: 3, wet: 3, teamId: "mercedes", salary: 5, contractEnd: 2028 },
+  { name: "Fernando Alonso", age: 44, ovr: 83, pace: 3, consistency: 5, wet: 5, teamId: "aston", salary: 18, contractEnd: 2026 },
+  { name: "Lance Stroll", age: 27, ovr: 74, pace: 3, consistency: 3, wet: 3, teamId: "aston", salary: 10, contractEnd: 2027 },
+  { name: "Pierre Gasly", age: 30, ovr: 82, pace: 4, consistency: 4, wet: 3, teamId: "alpine", salary: 10, contractEnd: 2028 },
+  { name: "Franco Colapinto", age: 21, ovr: 75, pace: 4, consistency: 3, wet: 3, teamId: "alpine", salary: 3, contractEnd: 2027 },
+  { name: "Carlos Sainz", age: 31, ovr: 88, pace: 4, consistency: 5, wet: 4, teamId: "williams", salary: 18, contractEnd: 2027 },
+  { name: "Alex Albon", age: 30, ovr: 81, pace: 4, consistency: 3, wet: 3, teamId: "williams", salary: 8, contractEnd: 2027 },
+  { name: "Esteban Ocon", age: 29, ovr: 79, pace: 3, consistency: 4, wet: 3, teamId: "haas", salary: 6, contractEnd: 2027 },
+  { name: "Oliver Bearman", age: 21, ovr: 77, pace: 4, consistency: 3, wet: 3, teamId: "haas", salary: 3, contractEnd: 2027 },
+  { name: "Nico Hulkenberg", age: 38, ovr: 78, pace: 3, consistency: 4, wet: 3, teamId: "audi", salary: 6, contractEnd: 2028 },
+  { name: "Gabriel Bortoleto", age: 22, ovr: 76, pace: 4, consistency: 3, wet: 3, teamId: "audi", salary: 3, contractEnd: 2028 },
+  { name: "Liam Lawson", age: 24, ovr: 77, pace: 4, consistency: 3, wet: 3, teamId: "racingbulls", salary: 3, contractEnd: 2027 },
+  { name: "Arvid Lindblad", age: 18, ovr: 73, pace: 4, consistency: 3, wet: 2, teamId: "racingbulls", salary: 2, contractEnd: 2027 },
+  { name: "Sergio Perez", age: 36, ovr: 76, pace: 3, consistency: 4, wet: 3, teamId: "cadillac", salary: 8, contractEnd: 2027 },
+  { name: "Valtteri Bottas", age: 36, ovr: 75, pace: 3, consistency: 4, wet: 3, teamId: "cadillac", salary: 5, contractEnd: 2027 },
+];
+
+const PROSPECTS = [
+  { name: "Nikola Tsolov", age: 19, ovr: 72, pace: 4, consistency: 3, wet: 3, series: "F2", salary: 2, pot: 88 },
+  { name: "Rafael Câmara", age: 20, ovr: 71, pace: 4, consistency: 3, wet: 3, series: "F2", salary: 2, pot: 86 },
+  { name: "Gabriele Minì", age: 20, ovr: 70, pace: 4, consistency: 3, wet: 3, series: "F2", salary: 2, pot: 85 },
+  { name: "Laurens van Hoepen", age: 20, ovr: 69, pace: 4, consistency: 3, wet: 2, series: "F2", salary: 1, pot: 84 },
+  { name: "Joshua Dürksen", age: 22, ovr: 70, pace: 3, consistency: 4, wet: 3, series: "F2", salary: 2, pot: 82 },
+  { name: "Dino Beganovic", age: 22, ovr: 69, pace: 3, consistency: 3, wet: 3, series: "F2", salary: 1, pot: 81 },
+  { name: "Martinius Stenshorne", age: 19, ovr: 67, pace: 4, consistency: 3, wet: 2, series: "F2", salary: 1, pot: 83 },
+  { name: "Alexander Dunne", age: 21, ovr: 68, pace: 3, consistency: 3, wet: 3, series: "F2", salary: 1, pot: 80 },
+  { name: "Sebastián Montoya", age: 20, ovr: 67, pace: 3, consistency: 3, wet: 2, series: "F2", salary: 1, pot: 79 },
+  { name: "Oliver Goethe", age: 21, ovr: 66, pace: 3, consistency: 3, wet: 2, series: "F2", salary: 1, pot: 77 },
+  { name: "Colton Herta", age: 26, ovr: 74, pace: 4, consistency: 3, wet: 3, series: "F2", salary: 3, pot: 80 },
+  { name: "Ritomo Miyata", age: 24, ovr: 68, pace: 3, consistency: 3, wet: 3, series: "F2", salary: 1, pot: 78 },
+  { name: "Pato O'Ward", age: 27, ovr: 80, pace: 4, consistency: 4, wet: 3, series: "IndyCar", salary: 5, pot: 85 },
+  { name: "Kyle Kirkwood", age: 27, ovr: 76, pace: 4, consistency: 3, wet: 3, series: "IndyCar", salary: 3, pot: 80 },
+  { name: "David Malukas", age: 25, ovr: 73, pace: 4, consistency: 3, wet: 2, series: "IndyCar", salary: 2, pot: 80 },
+  { name: "Nolan Siegel", age: 21, ovr: 70, pace: 4, consistency: 3, wet: 2, series: "IndyCar", salary: 2, pot: 82 },
+  { name: "Christian Lundgaard", age: 25, ovr: 74, pace: 3, consistency: 4, wet: 3, series: "IndyCar", salary: 3, pot: 79 },
+  { name: "Ugo Ugochukwu", age: 18, ovr: 63, pace: 4, consistency: 2, wet: 2, series: "F3", salary: 1, pot: 87 },
+  { name: "Noel León", age: 20, ovr: 65, pace: 3, consistency: 3, wet: 2, series: "F2", salary: 1, pot: 78 },
+  { name: "Mari Boya", age: 20, ovr: 64, pace: 3, consistency: 3, wet: 2, series: "F2", salary: 1, pot: 76 },
+];
+
+const RACES_2026 = [
+  { name: "Australian GP", circuit: "Albert Park", country: "AUS", baseLap: 78.5, laps: 58 },
+  { name: "Chinese GP", circuit: "Shanghai International", country: "CHN", baseLap: 96.0, laps: 56 },
+  { name: "Japanese GP", circuit: "Suzuka", country: "JPN", baseLap: 90.5, laps: 53 },
+  { name: "Miami GP", circuit: "Miami International", country: "USA", baseLap: 89.0, laps: 57 },
+  { name: "Emilia Romagna GP", circuit: "Imola", country: "ITA", baseLap: 75.5, laps: 63 },
+  { name: "Monaco GP", circuit: "Circuit de Monaco", country: "MON", baseLap: 72.0, laps: 78 },
+  { name: "Spanish GP", circuit: "Barcelona-Catalunya", country: "ESP", baseLap: 77.5, laps: 66 },
+  { name: "Canadian GP", circuit: "Circuit Gilles Villeneuve", country: "CAN", baseLap: 73.5, laps: 70 },
+  { name: "Austrian GP", circuit: "Red Bull Ring", country: "AUT", baseLap: 65.5, laps: 71 },
+  { name: "British GP", circuit: "Silverstone", country: "GBR", baseLap: 87.0, laps: 52 },
+  { name: "Belgian GP", circuit: "Spa-Francorchamps", country: "BEL", baseLap: 105.0, laps: 44 },
+  { name: "Hungarian GP", circuit: "Hungaroring", country: "HUN", baseLap: 77.0, laps: 70 },
+  { name: "Dutch GP", circuit: "Zandvoort", country: "NED", baseLap: 71.0, laps: 72 },
+  { name: "Italian GP", circuit: "Monza", country: "ITA", baseLap: 80.5, laps: 53 },
+  { name: "Azerbaijan GP", circuit: "Baku City Circuit", country: "AZE", baseLap: 103.0, laps: 51 },
+  { name: "Singapore GP", circuit: "Marina Bay", country: "SGP", baseLap: 99.0, laps: 62 },
+  { name: "US GP", circuit: "COTA", country: "USA", baseLap: 95.5, laps: 56 },
+  { name: "Mexico City GP", circuit: "Hermanos Rodríguez", country: "MEX", baseLap: 77.0, laps: 71 },
+  { name: "São Paulo GP", circuit: "Interlagos", country: "BRA", baseLap: 71.0, laps: 71 },
+  { name: "Las Vegas GP", circuit: "Las Vegas Strip", country: "USA", baseLap: 93.0, laps: 50 },
+  { name: "Qatar GP", circuit: "Lusail", country: "QAT", baseLap: 84.0, laps: 57 },
+  { name: "Abu Dhabi GP", circuit: "Yas Marina", country: "UAE", baseLap: 86.0, laps: 58 },
+];
+
+const POINTS = [25, 18, 15, 12, 10, 8, 6, 4, 2, 1];
+const WEATHER_TYPES = [
+  { id: "dry", label: "DRY", icon: "☀️", chance: 0.55 },
+  { id: "cloudy", label: "OVERCAST", icon: "☁️", chance: 0.2 },
+  { id: "wet", label: "WET", icon: "🌧️", chance: 0.15 },
+  { id: "storm", label: "STORM", icon: "⛈️", chance: 0.1 },
+];
+
+export { TEAMS, F1_DRIVERS, PROSPECTS, RACES_2026, POINTS, WEATHER_TYPES };
