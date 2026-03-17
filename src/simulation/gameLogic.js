@@ -252,16 +252,22 @@ function formatTime(s) { const m = Math.floor(s / 60); return `${m}:${(s % 60).t
 
 function generateQuali(allDrivers, race, weather, modifiers, teamCars) {
   const isWet = weather.id === "wet" || weather.id === "storm";
-  const trackForm = {}; TEAMS.forEach(t => { trackForm[t.id] = (Math.random() - 0.5) * 0.6 + getTeamMod(modifiers, t.id) * 0.12; });
+  const trackForm = {};
+  TEAMS.forEach(t => {
+    trackForm[t.id] = (Math.random() - 0.5) * 0.35 + getTeamMod(modifiers, t.id) * 0.15;
+  });
+
   return allDrivers.map(d => {
     const pMod = getDriverMod(modifiers, d.id, "pace");
     const cMod = getDriverMod(modifiers, d.id, "consistency");
     const carVal = teamCars?.[d.teamId] ?? 75;
-    const carPerf = (carVal / 100) * 5.0;                        // CAR: dominant — ~3.5 to 4.75s
-    const driverSkill = ((d.ovr + cMod) / 100) * 1.5             // DRIVER: secondary — ~1.1 to 1.5s
-      + ((d.pace + pMod) / 5) * 0.6                               // Pace talent
-      + (isWet ? (d.wet / 5) * 0.8 : 0);                         // Wet skill
-    const luck = (Math.random() - 0.5) * 1.4;                     // ±0.7s variance
+    const carPerf = (carVal / 100) * 5.3;
+    const driverSkill = (d.ovr / 100) * 1.8
+      + ((d.pace + pMod) / 5) * 0.7
+      + ((d.consistency + cMod) / 5) * 0.35
+      + (isWet ? (d.wet / 5) * 1.1 : 0);
+    const luck = (Math.random() - 0.5) * 0.9;
+
     const lapTime = race.baseLap + (isWet ? 8 + Math.random() * 4 : 0)
       - carPerf - driverSkill + luck + (trackForm[d.teamId] || 0);
     const crashed = Math.random() < 0.03;
@@ -271,23 +277,30 @@ function generateQuali(allDrivers, race, weather, modifiers, teamCars) {
 
 function generateRace(qualiResults, race, weather, modifiers, teamCars) {
   const isWet = weather.id === "wet" || weather.id === "storm";
-  const trackForm = {}; TEAMS.forEach(t => { trackForm[t.id] = (Math.random() - 0.5) * 4 + getTeamMod(modifiers, t.id) * 1.5; });
-  const chaotic = Math.random() < 0.1;
+  const trackForm = {};
+  TEAMS.forEach(t => {
+    trackForm[t.id] = (Math.random() - 0.5) * 2.4 + getTeamMod(modifiers, t.id) * 1.8;
+  });
+  const chaotic = Math.random() < 0.08;
+
   return qualiResults.map((d, gp) => {
     const cMod = getDriverMod(modifiers, d.id, "consistency");
     const pMod = getDriverMod(modifiers, d.id, "pace");
+    const consistency = Math.max(1, Math.min(5, d.consistency + cMod));
     const carVal = teamCars?.[d.teamId] ?? 75;
-    const carBase = carVal * 1.5;                                  // top car ~142, worst ~105
-    const driverBase = (d.ovr * 0.4)                              // raw talent
-      + ((d.consistency + cMod) * 2.0)                             // consistency king in races
-      + ((d.pace + pMod) * 0.8)                                    // outright speed
-      + (isWet ? d.wet * 2.5 : 0);                                 // wet craft
-    const gridBonus = (qualiResults.length - gp) * 0.8;
+
+    const carBase = carVal * 1.85;
+    const driverBase = (d.ovr * 0.7)
+      + (consistency * 4.0)
+      + ((d.pace + pMod) * 1.8)
+      + (isWet ? d.wet * 3.2 : 0);
+    const gridBonus = (qualiResults.length - gp) * 2.2;
     const form = trackForm[d.teamId] || 0;
-    const luckRange = chaotic ? 14 : 8;
+    const luckRange = (chaotic ? 10 : 5.2) - (consistency - 1) * 0.5;
     const luck = (Math.random() - 0.5) * 2 * luckRange;
-    const dnfChance = 0.03 + (gp > 15 ? 0.02 : 0);
+    const dnfChance = Math.max(0.015, 0.04 - consistency * 0.003 + (gp > 15 ? 0.01 : 0));
     const dnf = Math.random() < dnfChance;
+
     return { ...d, raceScore: dnf ? -999 : carBase + driverBase + gridBonus + form + luck, dnf, gridPos: gp + 1 };
   }).sort((a, b) => b.raceScore - a.raceScore);
 }
