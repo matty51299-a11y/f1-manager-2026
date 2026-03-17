@@ -661,22 +661,43 @@ function RaceTab({ currentRace, weekendPhase, qualiResults, qualiWeather, raceRe
             <span style={{ fontSize: 9, color: raceResult.wet ? "#60A5FA" : TEXT2, letterSpacing: 2, marginTop: -14 }}>{raceResult.weather?.label}</span>
             {weekendPhase === "race_reveal" && <span style={{ marginTop: -14, fontSize: 9, color: "#EF4444", letterSpacing: 2 }}><style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}`}</style><span style={{ animation: "pulse 1s infinite" }}>● LIVE</span></span>}
           </div>
-          <table style={{ width: "100%", maxWidth: 750, borderCollapse: "collapse" }}>
-            <thead><tr style={{ borderBottom: `1px solid ${BORDER2}` }}>{["POS", "DRIVER", "TEAM", "GRID", "+/-", "PTS"].map(h => (<th key={h} style={{ textAlign: "left", padding: "6px 8px", fontSize: 8, color: DIM, letterSpacing: 2, fontWeight: 600 }}>{h}</th>))}</tr></thead>
-            <tbody>{raceResult.results.map((d, i) => {
-              const rc = weekendPhase === "race_done" ? raceResult.results.length : raceRevealCount;
-              const vis = i < rc; const dt = TEAMS.find(t => t.id === d.teamId); const mine = d.teamId === team.id;
-              const pc = d.dnf ? null : d.gridPos - (i + 1);
-              return (<tr key={d.id} style={{ borderBottom: `1px solid ${BORDER}`, background: mine ? `${team.color}25` : "transparent", opacity: vis ? 1 : 0, transform: vis ? "translateX(0)" : "translateX(-20px)", transition: "all 0.3s ease-out" }}>
-                <td style={{ padding: "8px", fontWeight: 700, color: d.dnf ? "#EF4444" : i < 3 ? "#fff" : DIM, width: 36 }}>{d.dnf ? "DNF" : i + 1}</td>
-                <td style={{ padding: "8px", fontWeight: mine ? 800 : 400, color: mine ? "#fff" : TEXT }}>{d.name}</td>
-                <td style={{ padding: "8px" }}><span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><TeamBadge teamId={d.teamId} size={14} /><span style={{ color: DIM, fontSize: 11 }}>{dt?.name}</span></span></td>
-                <td style={{ padding: "8px", color: DIM, fontSize: 11 }}>P{d.gridPos}</td>
-                <td style={{ padding: "8px", fontSize: 11, fontWeight: 700, color: d.dnf ? DIM3 : pc > 0 ? "#22C55E" : pc < 0 ? "#EF4444" : DIM }}>{d.dnf ? "—" : pc > 0 ? `▲${pc}` : pc < 0 ? `▼${Math.abs(pc)}` : "—"}</td>
-                <td style={{ padding: "8px", color: !d.dnf && i < 10 ? "#E2B53A" : DIM3, fontWeight: 700 }}>{d.dnf ? "—" : (POINTS[i] || 0)}</td>
-              </tr>);
-            })}</tbody>
-          </table>
+          {(() => {
+            const finishers = raceResult.results.filter(r => !r.dnf);
+            const fastestLap = finishers.length > 0 ? finishers.reduce((best, cur) => {
+              if (!best) return cur;
+              const b = (best.pace || 0) + (best.consistency || 0) + (best.ovr || 0) / 25;
+              const c = (cur.pace || 0) + (cur.consistency || 0) + (cur.ovr || 0) / 25;
+              return c > b ? cur : best;
+            }, null) : null;
+            return (<>
+              {fastestLap && <div style={{ marginBottom: 8, fontSize: 10, letterSpacing: 2, color: "#F59E0B", fontWeight: 700 }}>⚡ FASTEST LAP: {fastestLap.name}</div>}
+              <table style={{ width: "100%", maxWidth: 750, borderCollapse: "collapse" }}>
+                <thead><tr style={{ borderBottom: `1px solid ${BORDER2}` }}>{["POS", "DRIVER", "TEAM", "GRID", "+/-", "PTS", "FL"].map(h => (<th key={h} style={{ textAlign: "left", padding: "6px 8px", fontSize: 8, color: DIM, letterSpacing: 2, fontWeight: 600 }}>{h}</th>))}</tr></thead>
+                <tbody>{raceResult.results.map((d, i) => {
+                  const rc = weekendPhase === "race_done" ? raceResult.results.length : raceRevealCount;
+                  const vis = i < rc; const dt = TEAMS.find(t => t.id === d.teamId); const mine = d.teamId === team.id;
+                  const pc = d.dnf ? null : d.gridPos - (i + 1);
+                  const podiumBg = i === 0 ? "rgba(226,181,58,0.2)" : i === 1 ? "rgba(156,163,175,0.16)" : i === 2 ? "rgba(194,120,3,0.16)" : "transparent";
+                  const podiumBorder = i === 0 ? "#E2B53A" : i === 1 ? "#9CA3AF" : i === 2 ? "#C77803" : null;
+                  const isFastest = fastestLap && d.id === fastestLap.id && !d.dnf;
+                  return (<tr key={d.id} style={{ borderBottom: `1px solid ${BORDER}`, background: mine ? `${team.color}25` : podiumBg, boxShadow: podiumBorder ? `inset 3px 0 0 ${podiumBorder}` : "none", opacity: vis ? 1 : 0, transform: vis ? "translateX(0)" : "translateX(-20px)", transition: "all 0.3s ease-out" }}>
+                    <td style={{ padding: "8px", fontWeight: 800, color: d.dnf ? "#EF4444" : i < 3 ? "#fff" : DIM, width: 44 }}>{d.dnf ? "DNF" : i + 1}</td>
+                    <td style={{ padding: "8px", fontWeight: mine ? 800 : 500, color: d.dnf ? "#FCA5A5" : mine ? "#fff" : TEXT, textDecoration: d.dnf ? "line-through" : "none" }}>
+                      {i < 3 && !d.dnf ? <span style={{ marginRight: 5 }}>{i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉"}</span> : null}
+                      {d.name}
+                    </td>
+                    <td style={{ padding: "8px" }}><span style={{ display: "inline-flex", alignItems: "center", gap: 5, opacity: d.dnf ? 0.75 : 1 }}><TeamBadge teamId={d.teamId} size={14} /><span style={{ color: DIM, fontSize: 11 }}>{dt?.name}</span></span></td>
+                    <td style={{ padding: "8px", color: DIM, fontSize: 11 }}>P{d.gridPos}</td>
+                    <td style={{ padding: "8px", fontSize: 10, fontWeight: 800 }}>
+                      {d.dnf ? <span style={{ color: DIM3 }}>—</span> : pc > 0 ? <span style={{ color: "#4ADE80", background: "rgba(34,197,94,0.15)", border: "1px solid rgba(34,197,94,0.35)", padding: "1px 6px" }}>▲ {pc}</span> : pc < 0 ? <span style={{ color: "#F87171", background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.35)", padding: "1px 6px" }}>▼ {Math.abs(pc)}</span> : <span style={{ color: DIM }}>—</span>}
+                    </td>
+                    <td style={{ padding: "8px", color: !d.dnf && i < 10 ? "#E2B53A" : DIM3, fontWeight: 700 }}>{d.dnf ? "—" : (POINTS[i] || 0)}</td>
+                    <td style={{ padding: "8px", color: isFastest ? "#F59E0B" : DIM3, fontWeight: 800 }}>{isFastest ? "⚡" : "—"}</td>
+                  </tr>);
+                })}</tbody>
+              </table>
+            </>);
+          })()}
           {weekendPhase === "race_done" && (<div style={{ textAlign: "center", marginTop: 28 }}>
             <div style={{ fontSize: 11, color: "#E2B53A", letterSpacing: 3, fontWeight: 700 }}>🏆 {raceResult.results[0]?.name}</div>
             {raceIndex + 1 < RACES_2026.length ? <button onClick={nextWeekend} style={{ marginTop: 12, padding: "14px 48px", background: "rgba(0,0,0,0.15)", color: "#fff", border: `1px solid ${BORDER2}`, cursor: "pointer", fontSize: 12, fontWeight: 700, letterSpacing: 2, fontFamily: "inherit" }}>NEXT RACE →</button>
