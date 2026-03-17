@@ -609,6 +609,7 @@ function initGame(pid) {
     news: startNews, modifiers: effects.modifiers,
     unreadNews: startNews.length, teamCars,
     history: { totalWins: 0, totalPodiums: 0, totalPoles: 0, totalPoints: 0, totalRaces: 0, titles: { wdc: 0, wcc: 0 }, seasons: [], bestFinishes: [] },
+    driverSeasonStats: {}, driverCareer: {}, teamSeasonStats: {}, teamHistory: {},
     rivalry: null,
   };
 }

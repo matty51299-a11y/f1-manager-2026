@@ -31,6 +31,101 @@ function dots(n, max = 5) { return Array.from({ length: max }, (_, i) => (<span 
 function potBar(pot) { const pct = ((pot - 60) / 40) * 100; const col = pot >= 85 ? "#22C55E" : pot >= 80 ? "#E2B53A" : pot >= 75 ? "#F97316" : "#aaa"; return (<div style={{ display: "flex", alignItems: "center", gap: 6 }}><div style={{ width: 50, height: 4, background: "rgba(0,0,0,0.2)", borderRadius: 2 }}><div style={{ width: `${Math.max(pct, 5)}%`, height: "100%", background: col, borderRadius: 2 }} /></div><span style={{ fontSize: 10, color: col, fontWeight: 700 }}>{pot}</span></div>); }
 function Sec({ children }) { return <div style={{ fontSize: 10, letterSpacing: 3, color: "#fff", fontWeight: 700, marginBottom: 14, paddingBottom: 6, borderBottom: `1px solid ${BLUE}33` }}>{children}</div>; }
 function TS({ label, value, sub, color }) { return (<div><div style={{ fontSize: 9, color: DIM, letterSpacing: 2, marginBottom: 1 }}>{label}</div><div style={{ display: "flex", alignItems: "baseline", gap: 4 }}><span style={{ fontSize: 20, fontWeight: 900, color: color || "#fff", fontFamily: "'Arial Black', sans-serif" }}>{value}</span>{sub && <span style={{ fontSize: 9, color: DIM }}>{sub}</span>}</div></div>); }
+const blankSeasonStats = () => ({ points: 0, wins: 0, podiums: 0, poles: 0, races: 0, finishes: 0, sumFinish: 0, dnfs: 0 });
+const avgFinish = (st) => (st.finishes > 0 ? (st.sumFinish / st.finishes).toFixed(2) : "—");
+function ensureProfileData(state) {
+  const driverSeason = { ...(state.driverSeasonStats || {}) };
+  const driverCareer = { ...(state.driverCareer || {}) };
+  const teamSeason = { ...(state.teamSeasonStats || {}) };
+  const teamHistory = { ...(state.teamHistory || {}) };
+
+  state.drivers.forEach(d => {
+    if (!driverSeason[d.id]) driverSeason[d.id] = blankSeasonStats();
+    if (!driverCareer[d.id]) driverCareer[d.id] = { total: blankSeasonStats(), seasons: [] };
+  });
+  TEAMS.forEach(t => {
+    if (!teamSeason[t.id]) teamSeason[t.id] = blankSeasonStats();
+    if (!teamHistory[t.id]) teamHistory[t.id] = { seasons: [] };
+  });
+  return { driverSeason, driverCareer, teamSeason, teamHistory };
+}
+
+function updateProfileStats(prev, raceResult, driverPoints, constructorPoints, season, isLastRace) {
+  const seeded = ensureProfileData(prev);
+  const driverSeason = { ...seeded.driverSeason };
+  const driverCareer = { ...seeded.driverCareer };
+  const teamSeason = { ...seeded.teamSeason };
+  const teamHistory = { ...seeded.teamHistory };
+
+  raceResult.results.forEach((res, pos) => {
+    const finishPos = pos + 1;
+    const pts = res.dnf ? 0 : (POINTS[pos] || 0);
+
+    const ds = { ...(driverSeason[res.id] || blankSeasonStats()) };
+    ds.races += 1;
+    ds.points = driverPoints[res.id] || (ds.points + pts);
+    if (res.dnf) ds.dnfs += 1;
+    else {
+      ds.finishes += 1;
+      ds.sumFinish += finishPos;
+      if (finishPos === 1) ds.wins += 1;
+      if (finishPos <= 3) ds.podiums += 1;
+    }
+    driverSeason[res.id] = ds;
+
+    const ts = { ...(teamSeason[res.teamId] || blankSeasonStats()) };
+    ts.races += 1;
+    ts.points = constructorPoints[res.teamId] || (ts.points + pts);
+    if (res.dnf) ts.dnfs += 1;
+    else {
+      ts.finishes += 1;
+      ts.sumFinish += finishPos;
+      if (finishPos === 1) ts.wins += 1;
+      if (finishPos <= 3) ts.podiums += 1;
+    }
+    teamSeason[res.teamId] = ts;
+  });
+
+  const pole = prev.qualiResults?.[0];
+  if (pole && !pole.crashed) {
+    const ps = { ...(driverSeason[pole.id] || blankSeasonStats()) };
+    ps.poles += 1;
+    driverSeason[pole.id] = ps;
+
+    const pts = { ...(teamSeason[pole.teamId] || blankSeasonStats()) };
+    pts.poles += 1;
+    teamSeason[pole.teamId] = pts;
+  }
+
+  if (isLastRace) {
+    Object.entries(driverSeason).forEach(([id, stat]) => {
+      const prevCareer = driverCareer[id] || { total: blankSeasonStats(), seasons: [] };
+      const total = { ...prevCareer.total };
+      total.points += stat.points;
+      total.wins += stat.wins;
+      total.podiums += stat.podiums;
+      total.poles += stat.poles;
+      total.races += stat.races;
+      total.finishes += stat.finishes;
+      total.sumFinish += stat.sumFinish;
+      total.dnfs += stat.dnfs;
+      const seasons = [...(prevCareer.seasons || []), { season, ...stat }];
+      driverCareer[id] = { total, seasons };
+      driverSeason[id] = blankSeasonStats();
+    });
+
+    Object.entries(teamSeason).forEach(([id, stat]) => {
+      const standingsPos = Object.entries(constructorPoints).map(([tid, pts]) => ({ tid, pts })).sort((a, b) => b.pts - a.pts).findIndex(row => row.tid === id) + 1;
+      const prevHist = teamHistory[id] || { seasons: [] };
+      teamHistory[id] = {
+        seasons: [...(prevHist.seasons || []), { season, ...stat, position: standingsPos || null }],
+      };
+      teamSeason[id] = blankSeasonStats();
+    });
+  }
+
+  return { driverSeason, driverCareer, teamSeason, teamHistory };
+}
 
 export default function F1Manager() {
   const [game, setGame] = useState(null);
@@ -63,7 +158,7 @@ export default function F1Manager() {
   }
 
   /* ── GAME LOGIC ── */
-  const { team, drivers, prospects, budget, season, raceIndex, raceResults, driverPoints, constructorPoints, tab, weekendPhase, qualiResults, raceResult, qualiWeather, revealCount, raceRevealCount, news, modifiers, unreadNews, teamCars, history, rivalry } = game;
+  const { team, drivers, prospects, budget, season, raceIndex, raceResults, driverPoints, constructorPoints, tab, weekendPhase, qualiResults, raceResult, qualiWeather, revealCount, raceRevealCount, news, modifiers, unreadNews, teamCars, history, rivalry, driverSeasonStats, driverCareer, teamSeasonStats, teamHistory } = game;
   const myDrivers = drivers.filter(d => d.teamId === team.id);
   const allActive = drivers.filter(d => d.teamId !== null);
   const currentRace = RACES_2026[raceIndex];
@@ -113,7 +208,8 @@ export default function F1Manager() {
             // Update rivalry
             const baseRivalry = updateRivalry(ncp, ndp, team, p.drivers, p.rivalry);
             const newRivalry = updateRivalryPostRace(baseRivalry, rr, team.id);
-            return { ...p, driverPoints: ndp, constructorPoints: ncp, weekendPhase: "race_done", raceResults: [...p.raceResults, rr], news: [...allNew, ...p.news], budget: effects.budget, modifiers: ticked, teamCars: regChange.teamCars, history: finalisedHist, rivalry: newRivalry };
+            const profileUpdates = updateProfileStats(p, rr, ndp, ncp, p.season, isLast);
+            return { ...p, driverPoints: ndp, constructorPoints: ncp, weekendPhase: "race_done", raceResults: [...p.raceResults, rr], news: [...allNew, ...p.news], budget: effects.budget, modifiers: ticked, teamCars: regChange.teamCars, history: finalisedHist, rivalry: newRivalry, driverSeasonStats: profileUpdates.driverSeason, driverCareer: profileUpdates.driverCareer, teamSeasonStats: profileUpdates.teamSeason, teamHistory: profileUpdates.teamHistory };
           });
         }, 400);
       }
@@ -331,6 +427,7 @@ export default function F1Manager() {
     { id: "squad", label: "SQUAD", icon: "👥" },
     { id: "scouting", label: "SCOUTING", icon: "🔍" },
     { id: "grid", label: "FULL GRID", icon: "🏎" },
+    { id: "profiles", label: "PROFILES", icon: "📁" },
     { id: "standings", label: "STANDINGS", icon: "📊" },
     { id: "calendar", label: "CALENDAR", icon: "📅" },
     { id: "history", label: "RECORDS", icon: "🏆" },
@@ -396,6 +493,7 @@ export default function F1Manager() {
           {tab === "squad" && <SquadTab {...{ myDrivers, team, driverPoints, releaseDriver, season }} />}
           {tab === "scouting" && <ScoutingTab {...{ prospects, budget, signProspect, myDrivers, team }} />}
           {tab === "grid" && <GridTab {...{ drivers, driverPoints, team, season, teamCars }} />}
+          {tab === "profiles" && <ProfilesTab {...{ drivers, teams: TEAMS, team, driverPoints, constructorPoints, season, driverSeasonStats, driverCareer, teamSeasonStats, teamHistory, teamCars }} />}
           {tab === "standings" && <StandingsTab {...{ driverStandings, constructorStandings, team }} />}
           {tab === "calendar" && <CalendarTab {...{ raceIndex, raceResults, team, season }} />}
           {tab === "history" && <HistoryTab history={history} team={team} rivalry={rivalry} />}
@@ -669,6 +767,149 @@ function GridTab({ drivers, driverPoints, team, season, teamCars }) {
       })}
     </div>
   </div>);
+}
+
+
+function ProfilesTab({ drivers, teams, team, driverPoints, constructorPoints, season, driverSeasonStats, driverCareer, teamSeasonStats, teamHistory, teamCars }) {
+  const [mode, setMode] = useState("drivers");
+  const activeDrivers = drivers.filter(d => d.teamId);
+  const [selectedDriverId, setSelectedDriverId] = useState(activeDrivers[0]?.id || null);
+  const [selectedTeamId, setSelectedTeamId] = useState(team.id);
+
+  const dSeason = driverSeasonStats || {};
+  const dCareer = driverCareer || {};
+  const tSeason = teamSeasonStats || {};
+  const tHistory = teamHistory || {};
+
+  const selectedDriver = activeDrivers.find(d => d.id === selectedDriverId) || activeDrivers[0];
+  const selectedTeam = teams.find(t => t.id === selectedTeamId) || team;
+  const selectedTeamDrivers = drivers.filter(d => d.teamId === selectedTeam?.id);
+
+  return (
+    <div>
+      <Sec>PROFILES</Sec>
+      <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+        {[
+          { id: "drivers", label: "DRIVER PROFILE" },
+          { id: "teams", label: "TEAM PROFILE" },
+        ].map(m => (
+          <button key={m.id} onClick={() => setMode(m.id)} style={{ padding: "5px 14px", background: mode === m.id ? "rgba(0,0,0,0.15)" : "transparent", border: `1px solid ${mode === m.id ? BORDER2 : BORDER}`, color: mode === m.id ? "#fff" : DIM, cursor: "pointer", fontSize: 10, fontFamily: "inherit", letterSpacing: 1, fontWeight: mode === m.id ? 700 : 400 }}>{m.label}</button>
+        ))}
+      </div>
+
+      {mode === "drivers" && selectedDriver && (
+        <div>
+          <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap", maxWidth: 900 }}>
+            {activeDrivers.map(d => (
+              <button key={d.id} onClick={() => setSelectedDriverId(d.id)} style={{ padding: "5px 10px", background: selectedDriver.id === d.id ? `${(teams.find(t => t.id === d.teamId)?.color || BLUE)}33` : "transparent", border: `1px solid ${selectedDriver.id === d.id ? (teams.find(t => t.id === d.teamId)?.color || BORDER2) : BORDER}`, color: selectedDriver.id === d.id ? "#fff" : TEXT2, cursor: "pointer", fontSize: 10, fontFamily: "inherit" }}>{d.name}</button>
+            ))}
+          </div>
+          <div style={{ background: BG3, border: `1px solid ${BORDER}`, padding: 16, maxWidth: 900 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
+              <div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: "#fff", fontFamily: "'Arial Black', sans-serif" }}>{selectedDriver.name}</div>
+                <div style={{ fontSize: 10, color: DIM }}>Age {selectedDriver.age} · {(teams.find(t => t.id === selectedDriver.teamId)?.name) || "Free Agent"}</div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: 9, color: DIM, letterSpacing: 2 }}>OVR</div>
+                <div style={{ fontSize: 28, color: "#E2B53A", fontWeight: 900, fontFamily: "'Arial Black', sans-serif" }}>{selectedDriver.ovr}</div>
+              </div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", maxWidth: 360, gap: 12, marginBottom: 14 }}>
+              {[['PACE', selectedDriver.pace], ['CONSISTENCY', selectedDriver.consistency], ['WET', selectedDriver.wet]].map(([l, v]) => <div key={l}><div style={{ fontSize: 8, color: DIM, letterSpacing: 1, marginBottom: 3 }}>{l}</div>{dots(v)}</div>)}
+            </div>
+            <Sec>CURRENT SEASON</Sec>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(90px, 1fr))", gap: 8, marginBottom: 14 }}>
+              {(() => { const st = dSeason[selectedDriver.id] || blankSeasonStats(); return [
+                ["POINTS", driverPoints[selectedDriver.id] || st.points, "#E2B53A"],
+                ["WINS", st.wins, "#4ADE80"],
+                ["PODIUMS", st.podiums, BLUE],
+                ["POLES", st.poles, "#C084FC"],
+                ["AVG FIN", avgFinish(st), "#fff"],
+                ["DNFS", st.dnfs, "#F87171"],
+              ].map(([l,v,c]) => <div key={l} style={{ background: BG2, border: `1px solid ${BORDER}`, padding: "10px 12px" }}><div style={{ fontSize: 8, color: DIM, letterSpacing: 2 }}>{l}</div><div style={{ fontSize: 20, color: c, fontWeight: 900, fontFamily: "'Arial Black', sans-serif" }}>{v}</div></div>); })()}
+            </div>
+            <Sec>CAREER TOTALS</Sec>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(90px, 1fr))", gap: 8, marginBottom: 14 }}>
+              {(() => { const c = dCareer[selectedDriver.id]?.total || blankSeasonStats(); return [
+                ["POINTS", c.points, "#E2B53A"], ["WINS", c.wins, "#4ADE80"], ["PODIUMS", c.podiums, BLUE], ["POLES", c.poles, "#C084FC"], ["AVG FIN", avgFinish(c), "#fff"], ["DNFS", c.dnfs, "#F87171"],
+              ].map(([l,v,col]) => <div key={l} style={{ background: BG2, border: `1px solid ${BORDER}`, padding: "10px 12px" }}><div style={{ fontSize: 8, color: DIM, letterSpacing: 2 }}>{l}</div><div style={{ fontSize: 20, color: col, fontWeight: 900, fontFamily: "'Arial Black', sans-serif" }}>{v}</div></div>); })()}
+            </div>
+            <div>
+              <div style={{ fontSize: 9, color: DIM, letterSpacing: 2, marginBottom: 6 }}>CAREER BY SEASON</div>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead><tr style={{ borderBottom: `1px solid ${BORDER2}` }}>{["SEASON", "PTS", "W", "POD", "POLE", "AVG", "DNF"].map(h => <th key={h} style={{ textAlign: "left", padding: "6px 8px", fontSize: 8, color: DIM, letterSpacing: 2 }}>{h}</th>)}</tr></thead>
+                <tbody>
+                  {((dCareer[selectedDriver.id]?.seasons || []).length > 0 ? [...(dCareer[selectedDriver.id]?.seasons || [])].reverse() : [{ season, ...(dSeason[selectedDriver.id] || blankSeasonStats()), live: true }]).map((row, idx) => (
+                    <tr key={idx} style={{ borderBottom: `1px solid ${BORDER}` }}>
+                      <td style={{ padding: "8px", color: row.live ? BLUE : "#fff", fontWeight: 700 }}>{row.season}{row.live ? "*" : ""}</td>
+                      <td style={{ padding: "8px", color: "#E2B53A", fontWeight: 700 }}>{row.points}</td>
+                      <td style={{ padding: "8px", color: "#4ADE80" }}>{row.wins}</td>
+                      <td style={{ padding: "8px", color: BLUE }}>{row.podiums}</td>
+                      <td style={{ padding: "8px", color: "#C084FC" }}>{row.poles}</td>
+                      <td style={{ padding: "8px", color: TEXT2 }}>{avgFinish(row)}</td>
+                      <td style={{ padding: "8px", color: "#F87171" }}>{row.dnfs}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div style={{ fontSize: 9, color: DIM3, marginTop: 6 }}>* current in-progress season</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mode === "teams" && selectedTeam && (
+        <div>
+          <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap", maxWidth: 900 }}>
+            {teams.map(t => (<button key={t.id} onClick={() => setSelectedTeamId(t.id)} style={{ padding: "5px 10px", background: selectedTeam.id === t.id ? `${t.color}33` : "transparent", border: `1px solid ${selectedTeam.id === t.id ? t.color : BORDER}`, color: selectedTeam.id === t.id ? "#fff" : TEXT2, cursor: "pointer", fontSize: 10, fontFamily: "inherit" }}>{t.name}</button>))}
+          </div>
+          <div style={{ background: BG3, border: `1px solid ${BORDER}`, padding: 16, maxWidth: 900 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
+              <div><div style={{ display: "flex", alignItems: "center", gap: 8 }}><TeamBadge teamId={selectedTeam.id} size={24} /><span style={{ fontSize: 22, fontWeight: 900, color: "#fff", fontFamily: "'Arial Black', sans-serif" }}>{selectedTeam.name}</span></div><div style={{ fontSize: 10, color: DIM }}>Engine: {selectedTeam.engine}</div></div>
+              <div style={{ textAlign: "right" }}><div style={{ fontSize: 9, color: DIM, letterSpacing: 2 }}>CAR RATING</div><div style={{ fontSize: 28, color: "#E2B53A", fontWeight: 900, fontFamily: "'Arial Black', sans-serif" }}>{teamCars?.[selectedTeam.id] ?? selectedTeam.car}</div></div>
+            </div>
+            <Sec>CURRENT DRIVERS</Sec>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 }}>
+              {selectedTeamDrivers.map(d => <div key={d.id} style={{ background: BG2, border: `1px solid ${BORDER}`, padding: "10px 12px" }}><div style={{ fontWeight: 700, color: "#fff" }}>{d.name}</div><div style={{ fontSize: 10, color: DIM }}>OVR {d.ovr} · {driverPoints[d.id] || 0} pts</div></div>)}
+            </div>
+            <Sec>CURRENT SEASON</Sec>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(100px, 1fr))", gap: 8, marginBottom: 14 }}>
+              {(() => {
+                const st = tSeason[selectedTeam.id] || blankSeasonStats();
+                const pos = Object.entries(constructorPoints).sort((a,b)=>b[1]-a[1]).findIndex(([id]) => id === selectedTeam.id) + 1;
+                return [
+                  ["POSITION", pos || "—", "#fff"],
+                  ["POINTS", constructorPoints[selectedTeam.id] || st.points, "#E2B53A"],
+                  ["WINS", st.wins, "#4ADE80"],
+                  ["PODIUMS", st.podiums, BLUE],
+                ].map(([l,v,c]) => <div key={l} style={{ background: BG2, border: `1px solid ${BORDER}`, padding: "10px 12px" }}><div style={{ fontSize: 8, color: DIM, letterSpacing: 2 }}>{l}</div><div style={{ fontSize: 20, color: c, fontWeight: 900, fontFamily: "'Arial Black', sans-serif" }}>{v}</div></div>);
+              })()}
+            </div>
+            <Sec>TEAM HISTORY BY SEASON</Sec>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead><tr style={{ borderBottom: `1px solid ${BORDER2}` }}>{["SEASON", "WCC", "PTS", "W", "POD", "POLE", "AVG FIN", "DNF"].map(h => <th key={h} style={{ textAlign: "left", padding: "6px 8px", fontSize: 8, color: DIM, letterSpacing: 2 }}>{h}</th>)}</tr></thead>
+              <tbody>
+                {((tHistory[selectedTeam.id]?.seasons || []).length > 0 ? [...(tHistory[selectedTeam.id]?.seasons || [])].reverse() : [{ season, ...(tSeason[selectedTeam.id] || blankSeasonStats()), position: "—", live: true }]).map((row, idx) => (
+                  <tr key={idx} style={{ borderBottom: `1px solid ${BORDER}` }}>
+                    <td style={{ padding: "8px", color: row.live ? BLUE : "#fff", fontWeight: 700 }}>{row.season}{row.live ? "*" : ""}</td>
+                    <td style={{ padding: "8px", color: TEXT2 }}>P{row.position || "—"}</td>
+                    <td style={{ padding: "8px", color: "#E2B53A", fontWeight: 700 }}>{row.points}</td>
+                    <td style={{ padding: "8px", color: "#4ADE80" }}>{row.wins}</td>
+                    <td style={{ padding: "8px", color: BLUE }}>{row.podiums}</td>
+                    <td style={{ padding: "8px", color: "#C084FC" }}>{row.poles}</td>
+                    <td style={{ padding: "8px", color: TEXT2 }}>{avgFinish(row)}</td>
+                    <td style={{ padding: "8px", color: "#F87171" }}>{row.dnfs}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div style={{ fontSize: 9, color: DIM3, marginTop: 6 }}>* current in-progress season</div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function StandingsTab({ driverStandings, constructorStandings, team }) {
