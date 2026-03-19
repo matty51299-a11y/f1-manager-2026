@@ -52,6 +52,101 @@ function ensureProfileData(state) {
   return { driverSeason, driverCareer, teamSeason, teamHistory };
 }
 
+function ratedProspectToDriver(pr, teamId, newSeason) {
+  const years = pr.ovr >= 80 ? 2 : 1;
+  return { ...pr, teamId, contractEnd: newSeason + years };
+}
+
+function enforceTeamRosterValidity(drivers, prospects, newSeason, transitionNews) {
+  const fixedDrivers = drivers.map(d => ({ ...d }));
+  let availableProspects = [...prospects];
+  const emergencyFirst = ["Ari", "Noel", "Rafa", "Mika", "Theo", "Luca", "Sami", "Nico"];
+  const emergencyLast = ["Ward", "Costa", "Bauer", "Khan", "Silva", "Meyer", "Sato", "Marin"];
+  let emergencyCounter = 0;
+
+  const driverScore = (d) => (d.ovr * 2) + ((d.pot || d.ovr) * 0.8) + (d.pace * 2) + d.consistency + ((36 - d.age) * 0.12);
+  const prospectScore = (d) => (d.ovr * 1.9) + ((d.pot || d.ovr) * 0.9) + (d.pace * 1.8) + d.consistency;
+
+  const bestFreeAgent = () => fixedDrivers.filter(d => d.teamId === null).sort((a, b) => driverScore(b) - driverScore(a))[0];
+  const bestProspect = () => availableProspects.sort((a, b) => prospectScore(b) - prospectScore(a))[0];
+  const makeEmergencyDriver = () => {
+    emergencyCounter += 1;
+    return {
+      id: 100000 + (newSeason * 100) + emergencyCounter,
+      name: `${pick(emergencyFirst)} ${pick(emergencyLast)}`,
+      age: pick([20, 21, 22, 23, 24]),
+      ovr: pick([68, 69, 70, 71, 72, 73]),
+      pace: pick([3, 4]),
+      consistency: pick([2, 3, 4]),
+      wet: pick([2, 3, 3, 4]),
+      salary: 2,
+      pot: pick([76, 78, 80, 82]),
+      teamId: null,
+      contractEnd: null,
+    };
+  };
+
+  const overflow = [];
+  TEAMS.forEach(t => {
+    const active = fixedDrivers.filter(d => d.teamId === t.id).sort((a, b) => driverScore(b) - driverScore(a));
+    if (active.length > 2) {
+      active.slice(2).forEach(d => overflow.push({ team: t, driver: d }));
+    }
+  });
+  overflow.forEach(({ team, driver }) => {
+    const idx = fixedDrivers.findIndex(d => d.id === driver.id);
+    if (idx >= 0) {
+      fixedDrivers[idx] = { ...fixedDrivers[idx], teamId: null, contractEnd: null };
+      transitionNews.push(makeNews(
+        `${team.name} Release ${driver.name}`,
+        `Roster rule enforcement trimmed ${team.name} back to two active race seats.`,
+        "Driver", 0
+      ));
+    }
+  });
+
+  TEAMS.forEach(t => {
+    let active = fixedDrivers.filter(d => d.teamId === t.id);
+    while (active.length < 2) {
+      const fa = bestFreeAgent();
+      if (fa) {
+        const idx = fixedDrivers.findIndex(d => d.id === fa.id);
+        if (idx >= 0) {
+          fixedDrivers[idx] = { ...fixedDrivers[idx], teamId: t.id, contractEnd: newSeason + (fa.ovr >= 84 ? 2 : 1) };
+          transitionNews.push(makeNews(
+            `${t.name} Finalize ${fa.name}`,
+            `${t.name} fill an open seat via free agency to satisfy the 2-driver roster requirement.`,
+            "Driver", 0
+          ));
+        }
+      } else {
+        const pr = bestProspect();
+        if (pr) {
+          const signed = ratedProspectToDriver(pr, t.id, newSeason);
+          fixedDrivers.push(signed);
+          availableProspects = availableProspects.filter(x => x.id !== pr.id);
+          transitionNews.push(makeNews(
+            `${t.name} Promote ${pr.name}`,
+            `${t.name} promote ${pr.name} to keep a valid two-driver race lineup.`,
+            "Driver", 0
+          ));
+        } else {
+          const emergency = makeEmergencyDriver();
+          fixedDrivers.push({ ...emergency, teamId: t.id, contractEnd: newSeason + 1 });
+          transitionNews.push(makeNews(
+            `${t.name} Sign Emergency Reserve`,
+            `${t.name} sign ${emergency.name} as an emergency replacement to keep the grid full.`,
+            "Driver", 0
+          ));
+        }
+      }
+      active = fixedDrivers.filter(d => d.teamId === t.id);
+    }
+  });
+
+  return { drivers: fixedDrivers, prospects: availableProspects };
+}
+
 function updateProfileStats(prev, raceResult, driverPoints, constructorPoints, season, isLastRace) {
   const seeded = ensureProfileData(prev);
   const driverSeason = { ...seeded.driverSeason };
@@ -234,19 +329,22 @@ export default function F1Manager() {
       const perfPts = p.driverPoints[d.id] || 0;
       const pot = d.pot || Math.min(98, d.ovr + 4);
       let ovrChange = 0;
-      if (newAge <= 21) ovrChange += pick([0, 1, 1, 2]);
-      else if (newAge <= 24) ovrChange += pick([-1, 0, 1, 1]);
-      else if (newAge <= 29) ovrChange += pick([-1, 0, 0, 1]);
-      else if (newAge <= 33) ovrChange += pick([-2, -1, 0, 0]);
-      else ovrChange += pick([-3, -2, -1, 0]);
-      if (pot - d.ovr >= 8 && newAge <= 25) ovrChange += maybe(0.45) ? 1 : 0;
-      if (pot - d.ovr <= 2 && newAge <= 25) ovrChange += maybe(0.25) ? -1 : 0;
-      if (perfPts >= 180) ovrChange += 2;
-      else if (perfPts >= 90) ovrChange += 1;
-      else if (perfPts <= 5 && newAge >= 30) ovrChange -= 1;
-      if (newAge <= 24 && pot >= 90 && maybe(0.12)) ovrChange += 2;
-      if (newAge >= 34 && maybe(0.15)) ovrChange -= 1;
-      ovrChange = Math.max(-4, Math.min(4, ovrChange));
+      if (newAge <= 20) ovrChange += pick([-1, 0, 1, 2, 2, 3]);
+      else if (newAge <= 24) ovrChange += pick([-2, -1, 0, 1, 2, 2]);
+      else if (newAge <= 29) ovrChange += pick([-2, -1, 0, 0, 1, 1, 2]);
+      else if (newAge <= 33) ovrChange += pick([-3, -2, -1, 0, 0, 1]);
+      else ovrChange += pick([-5, -4, -3, -2, -1, 0]);
+      if (pot - d.ovr >= 10 && newAge <= 25) ovrChange += maybe(0.5) ? pick([1, 2]) : 0;
+      if (pot - d.ovr <= 2 && newAge <= 25) ovrChange += maybe(0.3) ? -1 : 0;
+      if (perfPts >= 220) ovrChange += 3;
+      else if (perfPts >= 130) ovrChange += 2;
+      else if (perfPts >= 60) ovrChange += 1;
+      else if (perfPts <= 3 && newAge >= 30) ovrChange -= 2;
+      else if (perfPts <= 10 && newAge >= 30) ovrChange -= 1;
+      if (newAge <= 24 && pot >= 90 && maybe(0.22)) ovrChange += pick([2, 3]);
+      if (newAge >= 34 && maybe(0.22)) ovrChange -= pick([1, 2]);
+      if (newAge >= 37 && maybe(0.35)) ovrChange -= pick([1, 2, 3]);
+      ovrChange = Math.max(-6, Math.min(6, ovrChange));
       const newOvr = Math.max(55, Math.min(99, d.ovr + ovrChange));
       const newPot = Math.max(newOvr + 1, Math.min(99, pot + (newAge <= 22 && maybe(0.3) ? 1 : 0) - (newAge >= 31 ? 1 : 0)));
       return { ...d, age: newAge, ovr: newOvr, pot: newPot };
@@ -296,9 +394,10 @@ export default function F1Manager() {
       const attrs = ["aero", "power", "grip", "tyreWear", "reliability"];
       const evolved = {};
       attrs.forEach(attr => {
-        const focusBonus = attr === idn.focus ? 0.7 : 0;
-        const rnd = (Math.random() - 0.5) * (1.8 + idn.volatility * 1.6);
-        const delta = idn.dev * 0.9 + finishBonus + catchup + focusBonus + rnd;
+        const focusBonus = attr === idn.focus ? 1.1 : 0;
+        const conceptSwing = (Math.random() - 0.5) * (3.4 + idn.volatility * 2.6);
+        const executionSwing = (Math.random() - 0.5) * (2.4 + (1 - idn.dev) * 1.2);
+        const delta = (idn.dev * 1.15) + finishBonus + (catchup * 1.35) + focusBonus + conceptSwing + executionSwing;
         evolved[attr] = Math.max(62, Math.min(99, Math.round((oldProfile[attr] ?? oldProfile.overall) + delta)));
       });
       evolved.overall = Math.round((evolved.aero + evolved.power + evolved.grip + evolved.tyreWear + evolved.reliability) / 5);
@@ -310,18 +409,30 @@ export default function F1Manager() {
     const aiResult = aiTransfers(processedDrivers, allProspects, team.id, newSeason, transitionNews, p.driverPoints, p.constructorPoints, newTeamCars, expiringByTeam);
     const postAiDrivers = aiResult.drivers;
     const postAiProspects = aiResult.prospects;
+    const rosterFixed = enforceTeamRosterValidity(postAiDrivers, postAiProspects, newSeason, transitionNews);
 
-    const finalDrivers = postAiDrivers.map(d => (((d.age >= 44) || (d.age >= 39 && d.ovr < 74)) && d.teamId !== team.id) ? { ...d, teamId: null } : d);
-    const releasedDrivers = finalDrivers.filter(d => d.teamId === null && processedDrivers.find(pd => pd.id === d.id)?.teamId === team.id);
+    const finalDrivers = rosterFixed.drivers
+      .map(d => (((d.age >= 44) || (d.age >= 39 && d.ovr < 74)) && d.teamId !== team.id) ? { ...d, teamId: null } : d);
+    const rosterRevalidated = enforceTeamRosterValidity(finalDrivers, rosterFixed.prospects, newSeason, transitionNews);
+    const finalRosterDrivers = rosterRevalidated.drivers;
+    const finalProspects = rosterRevalidated.prospects;
+    const releasedDrivers = finalRosterDrivers.filter(d => d.teamId === null && processedDrivers.find(pd => pd.id === d.id)?.teamId === team.id);
 
     transitionNews.push(makeNews(`${newSeason} Season Begins`, `A new year dawns for ${team.name}. Base budget $${baseBudget}M + prize money $${prizeMoney}M from P${cPos}.`, "Team", 0));
     releasedDrivers.forEach(rd => transitionNews.push(makeNews(`${rd.name} Contract Expired`, `${rd.name}'s deal with ${team.name} has ended. The seat is now open.`, "Driver", 0)));
 
     const devSwing = TEAMS.map(t => ({ team: t, diff: (newTeamCars[t.id] || 0) - (p.teamCars?.[t.id] || t.car) })).sort((a, b) => b.diff - a.diff);
+    const driverSwing = finalRosterDrivers
+      .map(d => ({ driver: d, diff: d.ovr - (p.drivers.find(old => old.id === d.id)?.ovr || d.ovr) }))
+      .sort((a, b) => b.diff - a.diff);
+    const rosterValid = TEAMS.every(t => finalRosterDrivers.filter(d => d.teamId === t.id).length === 2);
     if (devSwing[0]?.diff > 0) transitionNews.push(makeNews(`Development Movers: ${devSwing[0].team.name}`, `${devSwing[0].team.name} made the biggest winter jump (+${devSwing[0].diff}).`, "Development", 0));
+    if (driverSwing[0]?.diff > 0) transitionNews.push(makeNews(`Breakout Watch: ${driverSwing[0].driver.name}`, `${driverSwing[0].driver.name} posted the biggest offseason rise (+${driverSwing[0].diff} OVR).`, "Driver", 0));
+    if (driverSwing[driverSwing.length - 1]?.diff < 0) transitionNews.push(makeNews(`Form Dip: ${driverSwing[driverSwing.length - 1].driver.name}`, `${driverSwing[driverSwing.length - 1].driver.name} had the sharpest offseason drop (${driverSwing[driverSwing.length - 1].diff} OVR).`, "Driver", 0));
+    transitionNews.push(makeNews(`Roster Audit ${rosterValid ? "Passed" : "Failed"}`, `All teams ${rosterValid ? "have exactly" : "do not have"} two active race drivers before round one.`, "Team", 0));
     transitionNews.push(makeNews(`New Talent Class Arrives`, `${freshProspects.length} new prospects enter the market this season.`, "Driver", 0));
 
-    const effects = applyNewsEffects(transitionNews, { budget: baseBudget + prizeMoney, modifiers: [], team, drivers: finalDrivers });
+    const effects = applyNewsEffects(transitionNews, { budget: baseBudget + prizeMoney, modifiers: [], team, drivers: finalRosterDrivers });
 
     return {
       ...p,
@@ -330,8 +441,8 @@ export default function F1Manager() {
       raceResults: [],
       driverPoints: {},
       constructorPoints: {},
-      drivers: finalDrivers,
-      prospects: postAiProspects,
+      drivers: finalRosterDrivers,
+      prospects: finalProspects,
       budget: effects.budget,
       modifiers: [],
       weekendPhase: "preview",
