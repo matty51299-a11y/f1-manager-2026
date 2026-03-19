@@ -228,30 +228,27 @@ export default function F1Manager() {
       const prizeMoney = cPos === 1 ? 15 : cPos === 2 ? 10 : cPos === 3 ? 8 : cPos <= 6 ? 5 : 3;
       const baseBudget = 50;
 
-      // Process drivers: age them, handle OVR growth/decline, expire contracts
-      const processedDrivers = p.drivers.map(d => {
+      // Process drivers: age them, handle OVR growth/decline
+      const agedDrivers = p.drivers.map(d => {
         const newAge = d.age + 1;
         let ovrChange = 0;
-        // Young drivers improve
-        if (newAge <= 23) ovrChange = Math.floor(Math.random() * 3) + 1; // +1 to +3
-        else if (newAge <= 27) ovrChange = Math.floor(Math.random() * 2); // 0 to +1
-        // Veterans decline
-        else if (newAge >= 36) ovrChange = -(Math.floor(Math.random() * 3) + 1); // -1 to -3
-        else if (newAge >= 33) ovrChange = -Math.floor(Math.random() * 2); // 0 to -1
-
+        if (newAge <= 23) ovrChange = Math.floor(Math.random() * 3) + 1;
+        else if (newAge <= 27) ovrChange = Math.floor(Math.random() * 2);
+        else if (newAge >= 36) ovrChange = -(Math.floor(Math.random() * 3) + 1);
+        else if (newAge >= 33) ovrChange = -Math.floor(Math.random() * 2);
         const newOvr = Math.max(55, Math.min(99, d.ovr + ovrChange));
-        const contractExpired = d.contractEnd && d.contractEnd <= p.season;
-        const isMyDriver = d.teamId === team.id;
+        return { ...d, age: newAge, ovr: newOvr };
+      });
 
-        return {
-          ...d,
-          age: newAge,
-          ovr: newOvr,
-          // If contract expired and they're on MY team, keep them but flag for renewal
-          // If contract expired and on another team, they stay (AI manages their own)
-          teamId: contractExpired && isMyDriver ? null : d.teamId,
-          contractEnd: contractExpired && !isMyDriver ? newSeason + 1 + Math.floor(Math.random() * 2) : d.contractEnd,
-        };
+      // Contracts tick down each year; expired contracts become free agents for market phase
+      const expiringByTeam = {};
+      const processedDrivers = agedDrivers.map(d => {
+        const contractExpired = d.contractEnd && d.contractEnd <= p.season;
+        if (contractExpired && d.teamId) {
+          if (!expiringByTeam[d.teamId]) expiringByTeam[d.teamId] = [];
+          expiringByTeam[d.teamId].push(d.id);
+        }
+        return contractExpired ? { ...d, teamId: null, contractEnd: null } : d;
       });
 
       // Refresh some prospects: remove signed ones, age them, add potential new F2 grads
@@ -285,7 +282,7 @@ export default function F1Manager() {
 
       // AI TRANSFERS — other teams shuffle their lineups
       const transitionNews = [];
-      const aiResult = aiTransfers(processedDrivers, allProspects, team.id, newSeason, transitionNews);
+      const aiResult = aiTransfers(processedDrivers, allProspects, team.id, newSeason, transitionNews, p.driverPoints, p.constructorPoints, newTeamCars, expiringByTeam);
       const postAiDrivers = aiResult.drivers;
       const postAiProspects = aiResult.prospects;
 
@@ -428,6 +425,7 @@ export default function F1Manager() {
     { id: "scouting", label: "SCOUTING", icon: "🔍" },
     { id: "grid", label: "FULL GRID", icon: "🏎" },
     { id: "profiles", label: "PROFILES", icon: "📁" },
+    { id: "contracts", label: "CONTRACTS", icon: "📜" },
     { id: "standings", label: "STANDINGS", icon: "📊" },
     { id: "calendar", label: "CALENDAR", icon: "📅" },
     { id: "history", label: "RECORDS", icon: "🏆" },
@@ -494,6 +492,7 @@ export default function F1Manager() {
           {tab === "scouting" && <ScoutingTab {...{ prospects, budget, signProspect, myDrivers, team }} />}
           {tab === "grid" && <GridTab {...{ drivers, driverPoints, team, season, teamCars }} />}
           {tab === "profiles" && <ProfilesTab {...{ drivers, teams: TEAMS, team, driverPoints, constructorPoints, season, driverSeasonStats, driverCareer, teamSeasonStats, teamHistory, teamCars }} />}
+          {tab === "contracts" && <ContractsTab {...{ drivers, season, team, driverPoints }} />}
           {tab === "standings" && <StandingsTab {...{ driverStandings, constructorStandings, team }} />}
           {tab === "calendar" && <CalendarTab {...{ raceIndex, raceResults, team, season }} />}
           {tab === "history" && <HistoryTab history={history} team={team} rivalry={rivalry} />}
@@ -659,7 +658,7 @@ function RaceTab({ currentRace, weekendPhase, qualiResults, qualiWeather, raceRe
             <Sec>{weekendPhase === "race_done" ? "CLASSIFICATION" : "RACE IN PROGRESS"}</Sec>
             <span style={{ fontSize: 20, marginTop: -14 }}>{raceResult.weather?.icon}</span>
             <span style={{ fontSize: 9, color: raceResult.wet ? "#60A5FA" : TEXT2, letterSpacing: 2, marginTop: -14 }}>{raceResult.weather?.label}</span>
-            {weekendPhase === "race_reveal" && <span style={{ marginTop: -14, fontSize: 9, color: "#EF4444", letterSpacing: 2 }}><style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}`}</style><span style={{ animation: "pulse 1s infinite" }}>● LIVE</span></span>}
+            {weekendPhase === "race_reveal" && <span style={{ marginTop: -14, fontSize: 9, color: "#60A5FA", letterSpacing: 2 }}><style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}`}</style><span style={{ animation: "pulse 1s infinite" }}>● LIVE</span></span>}
           </div>
           {(() => {
             const finishers = raceResult.results.filter(r => !r.dnf);
@@ -670,15 +669,15 @@ function RaceTab({ currentRace, weekendPhase, qualiResults, qualiWeather, raceRe
               return c > b ? cur : best;
             }, null) : null;
             return (<>
-              {fastestLap && <div style={{ marginBottom: 8, fontSize: 10, letterSpacing: 2, color: "#F59E0B", fontWeight: 700 }}>⚡ FASTEST LAP: {fastestLap.name}</div>}
+              {fastestLap && <div style={{ marginBottom: 8, fontSize: 10, letterSpacing: 2, color: "#C084FC", fontWeight: 700 }}>⚡ FASTEST LAP: {fastestLap.name}</div>}
               <table style={{ width: "100%", maxWidth: 750, borderCollapse: "collapse" }}>
                 <thead><tr style={{ borderBottom: `1px solid ${BORDER2}` }}>{["POS", "DRIVER", "TEAM", "GRID", "+/-", "PTS", "FL"].map(h => (<th key={h} style={{ textAlign: "left", padding: "6px 8px", fontSize: 8, color: DIM, letterSpacing: 2, fontWeight: 600 }}>{h}</th>))}</tr></thead>
                 <tbody>{raceResult.results.map((d, i) => {
                   const rc = weekendPhase === "race_done" ? raceResult.results.length : raceRevealCount;
                   const vis = i < rc; const dt = TEAMS.find(t => t.id === d.teamId); const mine = d.teamId === team.id;
                   const pc = d.dnf ? null : d.gridPos - (i + 1);
-                  const podiumBg = i === 0 ? "rgba(226,181,58,0.2)" : i === 1 ? "rgba(156,163,175,0.16)" : i === 2 ? "rgba(194,120,3,0.16)" : "transparent";
-                  const podiumBorder = i === 0 ? "#E2B53A" : i === 1 ? "#9CA3AF" : i === 2 ? "#C77803" : null;
+                  const podiumBg = i === 0 ? "rgba(255,215,0,0.18)" : i === 1 ? "rgba(255,214,102,0.14)" : i === 2 ? "rgba(234,179,8,0.14)" : "transparent";
+                  const podiumBorder = i === 0 ? "#FFD700" : i === 1 ? "#FACC15" : i === 2 ? "#EAB308" : null;
                   const isFastest = fastestLap && d.id === fastestLap.id && !d.dnf;
                   return (<tr key={d.id} style={{ borderBottom: `1px solid ${BORDER}`, background: mine ? `${team.color}25` : podiumBg, boxShadow: podiumBorder ? `inset 3px 0 0 ${podiumBorder}` : "none", opacity: vis ? 1 : 0, transform: vis ? "translateX(0)" : "translateX(-20px)", transition: "all 0.3s ease-out" }}>
                     <td style={{ padding: "8px", fontWeight: 800, color: d.dnf ? "#EF4444" : i < 3 ? "#fff" : DIM, width: 44 }}>{d.dnf ? "DNF" : i + 1}</td>
@@ -692,7 +691,7 @@ function RaceTab({ currentRace, weekendPhase, qualiResults, qualiWeather, raceRe
                       {d.dnf ? <span style={{ color: DIM3 }}>—</span> : pc > 0 ? <span style={{ color: "#4ADE80", background: "rgba(34,197,94,0.15)", border: "1px solid rgba(34,197,94,0.35)", padding: "1px 6px" }}>▲ {pc}</span> : pc < 0 ? <span style={{ color: "#F87171", background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.35)", padding: "1px 6px" }}>▼ {Math.abs(pc)}</span> : <span style={{ color: DIM }}>—</span>}
                     </td>
                     <td style={{ padding: "8px", color: !d.dnf && i < 10 ? "#E2B53A" : DIM3, fontWeight: 700 }}>{d.dnf ? "—" : (POINTS[i] || 0)}</td>
-                    <td style={{ padding: "8px", color: isFastest ? "#F59E0B" : DIM3, fontWeight: 800 }}>{isFastest ? "⚡" : "—"}</td>
+                    <td style={{ padding: "8px", color: isFastest ? "#C084FC" : DIM3, fontWeight: 800 }}>{isFastest ? "⚡" : "—"}</td>
                   </tr>);
                 })}</tbody>
               </table>
@@ -830,6 +829,7 @@ function ProfilesTab({ drivers, teams, team, driverPoints, constructorPoints, se
               <div>
                 <div style={{ fontSize: 22, fontWeight: 900, color: "#fff", fontFamily: "'Arial Black', sans-serif" }}>{selectedDriver.name}</div>
                 <div style={{ fontSize: 10, color: DIM }}>Age {selectedDriver.age} · {(teams.find(t => t.id === selectedDriver.teamId)?.name) || "Free Agent"}</div>
+                <div style={{ fontSize: 10, color: DIM2, marginTop: 3 }}>Contract: {selectedDriver.contractEnd || "Free Agent"} · Years remaining: {selectedDriver.contractEnd ? Math.max(0, selectedDriver.contractEnd - season) : 0} · Salary: ${selectedDriver.salary}M</div>
               </div>
               <div style={{ textAlign: "right" }}>
                 <div style={{ fontSize: 9, color: DIM, letterSpacing: 2 }}>OVR</div>
@@ -929,6 +929,52 @@ function ProfilesTab({ drivers, teams, team, driverPoints, constructorPoints, se
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function ContractsTab({ drivers, season, team, driverPoints }) {
+  const freeAgents = drivers.filter(d => d.teamId === null).sort((a, b) => b.ovr - a.ovr);
+  const contracted = drivers.filter(d => d.teamId !== null).sort((a, b) => (a.contractEnd || 0) - (b.contractEnd || 0));
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, maxWidth: 980 }}>
+      <div>
+        <Sec>CONTRACT STATUS</Sec>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead><tr style={{ borderBottom: `1px solid ${BORDER2}` }}>{["DRIVER", "TEAM", "END", "YRS", "SAL"].map(h => <th key={h} style={{ textAlign: "left", padding: "6px 8px", fontSize: 8, color: DIM, letterSpacing: 2 }}>{h}</th>)}</tr></thead>
+          <tbody>
+            {contracted.map(d => {
+              const t = TEAMS.find(x => x.id === d.teamId);
+              const yrs = d.contractEnd ? Math.max(0, d.contractEnd - season) : 0;
+              const danger = yrs <= 1;
+              const mine = d.teamId === team.id;
+              return <tr key={d.id} style={{ borderBottom: `1px solid ${BORDER}`, background: mine ? `${team.color}1f` : "transparent" }}>
+                <td style={{ padding: "8px", color: mine ? "#fff" : TEXT, fontWeight: mine ? 700 : 500 }}>{d.name}</td>
+                <td style={{ padding: "8px", color: TEXT2, fontSize: 11 }}>{t?.name}</td>
+                <td style={{ padding: "8px", color: danger ? "#F87171" : "#4ADE80", fontWeight: 700 }}>{d.contractEnd}</td>
+                <td style={{ padding: "8px", color: danger ? "#F87171" : DIM }}>{yrs}</td>
+                <td style={{ padding: "8px", color: "#E2B53A" }}>${d.salary}M</td>
+              </tr>;
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <Sec>FREE AGENTS</Sec>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead><tr style={{ borderBottom: `1px solid ${BORDER2}` }}>{["DRIVER", "AGE", "OVR", "LAST PTS", "ASKING"].map(h => <th key={h} style={{ textAlign: "left", padding: "6px 8px", fontSize: 8, color: DIM, letterSpacing: 2 }}>{h}</th>)}</tr></thead>
+          <tbody>
+            {freeAgents.length === 0 ? <tr><td style={{ padding: "12px 8px", color: DIM, fontSize: 11 }} colSpan={5}>No free agents currently.</td></tr> : freeAgents.map(d => <tr key={d.id} style={{ borderBottom: `1px solid ${BORDER}` }}>
+              <td style={{ padding: "8px", color: "#fff", fontWeight: 700 }}>{d.name}</td>
+              <td style={{ padding: "8px", color: DIM }}>{d.age}</td>
+              <td style={{ padding: "8px", color: "#E2B53A", fontWeight: 700 }}>{d.ovr}</td>
+              <td style={{ padding: "8px", color: TEXT2 }}>{driverPoints[d.id] || 0}</td>
+              <td style={{ padding: "8px", color: "#E2B53A" }}>${d.salary}M</td>
+            </tr>)}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
