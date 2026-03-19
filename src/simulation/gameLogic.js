@@ -1,4 +1,4 @@
-import { TEAMS, F1_DRIVERS, PROSPECTS, POINTS, WEATHER_TYPES } from "../data/gameData";
+import { TEAMS, F1_DRIVERS, PROSPECTS, TEAM_IDENTITIES, POINTS, WEATHER_TYPES } from "../data/gameData";
 
 let _newsId = 0;
 function makeNews(title, body, category, round, effect = null) {
@@ -309,153 +309,112 @@ function generateRace(qualiResults, race, weather, modifiers, teamCars) {
    HELPERS
    ═══════════════════════════════════════════ */
 
-function aiTransfers(drivers, prospects, teamId, newSeason, transitionNews) {
+function aiTransfers(drivers, prospects, teamId, newSeason, transitionNews, driverPoints = {}, constructorPoints = {}, teamCars = {}, expiringByTeam = {}) {
   const updatedDrivers = drivers.map(d => ({ ...d }));
   let availableProspects = [...prospects];
-  const released = new Set(); // track who was released so their old team can't re-sign them
 
-  // ── PHASE 1: ALL teams release drivers first ──
+  const teamStrength = (tid) => {
+    const cPts = constructorPoints?.[tid] || 0;
+    const car = teamCars?.[tid] ?? TEAMS.find(t => t.id === tid)?.car ?? 75;
+    const id = TEAM_IDENTITIES?.[tid] || { dev: 0.5, talent: 0.5 };
+    return car * (1.02 + id.dev * 0.1) + cPts * 0.25 + id.talent * 4;
+  };
+
+  const driverValue = (d) => {
+    const pts = driverPoints?.[d.id] || 0;
+    const agePrime = d.age <= 23 ? 1.5 : d.age <= 31 ? 4 : d.age <= 35 ? 2.5 : 0.8;
+    return d.ovr * 1.25 + pts * 0.18 + agePrime + (d.pace + d.consistency) * 0.8;
+  };
+
   TEAMS.forEach(t => {
-    if (t.id === teamId) return; // skip player team
-    const tDrivers = updatedDrivers.filter(d => d.teamId === t.id);
-    if (tDrivers.length === 0) return;
+    if (t.id === teamId) return; // player controls own contracts
 
-    // Sort worst first
-    const sorted = [...tDrivers].sort((a, b) => a.ovr - b.ovr);
-        const strongest = sorted[sorted.length - 1];
-    const teamCar = TEAMS.find(x => x.id === t.id)?.car || 75;
+    const strength = teamStrength(t.id);
+    const threshold = strength >= 95 ? 92 : strength >= 86 ? 86 : strength >= 78 ? 80 : 74;
+    const expiringIds = new Set(expiringByTeam?.[t.id] || []);
 
-    sorted.forEach(d => {
-      // Don't release if it would leave the team with 0 drivers
-      const remaining = updatedDrivers.filter(x => x.teamId === t.id).length;
-      if (remaining <= 1) return;
+    // Team keeps non-expired drivers by default
+    const retained = updatedDrivers.filter(d => d.teamId === t.id);
 
-      let shouldRelease = false;
-      let reason = "";
+    // Expiring drivers go to market unless re-signed below
+    let marketPool = updatedDrivers.filter(d => d.teamId === null);
+    let lineup = [...retained];
 
-      // Old veterans: 36+ with escalating probability
-      if (d.age >= 40) { shouldRelease = maybe(0.8); reason = "age and declining performance"; }
-      else if (d.age >= 37) { shouldRelease = maybe(0.5); reason = "the team's desire for a younger lineup"; }
-      else if (d.age >= 35 && d.ovr < 80) { shouldRelease = maybe(0.35); reason = "failing to match the car's potential"; }
+    // Re-sign top expiring drivers first (strong teams keep stars)
+    const expiringDrivers = updatedDrivers
+      .filter(d => expiringIds.has(d.id))
+      .sort((a, b) => driverValue(b) - driverValue(a));
 
-      // Underperformers relative to their teammate
-      if (!shouldRelease && strongest && d.id !== strongest.id) {
-        const gap = strongest.ovr - d.ovr;
-        if (gap >= 15) { shouldRelease = maybe(0.7); reason = "a significant performance gap to their teammate"; }
-        else if (gap >= 10) { shouldRelease = maybe(0.4); reason = "struggling to match their teammate's pace"; }
-        else if (gap >= 7) { shouldRelease = maybe(0.2); reason = "inconsistent results"; }
-      }
-
-      // Driver too weak for the car (top teams drop mid-tier drivers)
-      if (!shouldRelease && teamCar >= 85 && d.ovr < 78) {
-        shouldRelease = maybe(0.6);
-        reason = "not meeting the standards of a front-running team";
-      }
-      if (!shouldRelease && teamCar >= 75 && d.ovr < 72) {
-        shouldRelease = maybe(0.5);
-        reason = "underperforming relative to expectations";
-      }
-
-      // Low OVR in general
-      if (!shouldRelease && d.ovr < 70) {
-        shouldRelease = maybe(0.7);
-        reason = "a difficult season";
-      }
-
-      if (shouldRelease) {
+    expiringDrivers.forEach(d => {
+      if (lineup.length >= 2) return;
+      const value = driverValue(d);
+      const shouldResign = value >= threshold || (d.ovr >= 90 && maybe(0.92)) || (d.ovr >= 86 && maybe(0.75));
+      if (shouldResign) {
         const idx = updatedDrivers.findIndex(x => x.id === d.id);
         if (idx >= 0) {
-          const oldTeam = t.name;
-          updatedDrivers[idx] = { ...updatedDrivers[idx], teamId: null, contractEnd: null };
-          released.add(d.id);
-          // Retirement check: old + low OVR = retire, don't generate "free agent" news
-          if (d.age >= 38 && d.ovr < 77) {
-            transitionNews.push(makeNews(
-              `${d.name} Announces Retirement`,
-              `After ${pick(["a long and storied career", "years of dedicated service", "much deliberation"])}, ${d.name} has decided to hang up the helmet. The ${d.age}-year-old leaves the sport with the respect of the entire paddock.`,
-              "Driver", 0
-            ));
-          } else {
-            transitionNews.push(makeNews(
-              `${oldTeam} Release ${d.name}`,
-              `${d.name} departs ${oldTeam} after ${reason}. The ${d.age}-year-old (OVR ${d.ovr}) is now available on the market.`,
-              "Driver", 0
-            ));
-          }
-        }
-      }
-    });
-  });
-
-  // ── PHASE 2: ALL teams fill empty seats ──
-  TEAMS.forEach(t => {
-    if (t.id === teamId) return;
-    const currentCount = updatedDrivers.filter(d => d.teamId === t.id).length;
-    let needed = 2 - currentCount;
-    if (needed <= 0) return;
-
-    const teamCar = TEAMS.find(x => x.id === t.id)?.car || 75;
-
-    while (needed > 0) {
-      // Free agents: exclude drivers this team just released, and retired drivers
-      const freeAgents = updatedDrivers
-        .filter(d => d.teamId === null && !released.has(d.id) && !(d.age >= 38 && d.ovr < 77))
-        .sort((a, b) => b.ovr - a.ovr);
-
-      // Top teams prefer better drivers, backmarker teams are less picky
-      const targetOvr = teamCar >= 90 ? 80 : teamCar >= 80 ? 72 : 65;
-      const bestFA = freeAgents.find(d => d.ovr >= targetOvr) || freeAgents[0];
-      const bestProspect = availableProspects.sort((a, b) => b.ovr - a.ovr)[0];
-
-      // Prefer FA if they're clearly better, otherwise promote a prospect
-      if (bestFA && (!bestProspect || bestFA.ovr >= bestProspect.ovr + 3)) {
-        const idx = updatedDrivers.findIndex(x => x.id === bestFA.id);
-        if (idx >= 0) {
-          updatedDrivers[idx] = { ...updatedDrivers[idx], teamId: t.id, contractEnd: newSeason + 1 + Math.floor(Math.random() * 2) };
+          const years = d.ovr >= 90 ? 3 : d.ovr >= 82 ? 2 : 1;
+          updatedDrivers[idx] = { ...updatedDrivers[idx], teamId: t.id, contractEnd: newSeason + years };
+          lineup.push(updatedDrivers[idx]);
           transitionNews.push(makeNews(
-            `${bestFA.name} Signs for ${t.name}`,
-            `${t.name} have signed ${bestFA.name} (OVR ${bestFA.ovr}) to fill their vacant seat for ${newSeason}.`,
+            `${t.name} Re-Sign ${d.name}`,
+            `${t.name} have extended ${d.name}'s contract through ${newSeason + years} after a solid season (${driverPoints?.[d.id] || 0} pts).`,
             "Driver", 0
           ));
         }
-      } else if (bestProspect) {
-        const newDriver = { ...bestProspect, teamId: t.id, contractEnd: newSeason + 2 };
-        updatedDrivers.push(newDriver);
-        availableProspects = availableProspects.filter(x => x.id !== bestProspect.id);
-        transitionNews.push(makeNews(
-          `${t.name} Promote ${bestProspect.name}`,
-          `${bestProspect.series} talent ${bestProspect.name} (OVR ${bestProspect.ovr}) earns an F1 seat with ${t.name} for ${newSeason}.`,
-          "Driver", 0
-        ));
-      } else if (bestFA) {
-        // Fallback: sign anyone available
+      }
+    });
+
+    // Fill remaining seats from best available options weighted by team strength
+    while (lineup.length < 2) {
+      marketPool = updatedDrivers.filter(d => d.teamId === null).sort((a, b) => driverValue(b) - driverValue(a));
+      const prospectPool = [...availableProspects].sort((a, b) => (b.ovr + (b.pot || b.ovr) * 0.2) - (a.ovr + (a.pot || a.ovr) * 0.2));
+
+      const bestFA = marketPool[0];
+      const bestProspect = prospectPool[0];
+      if (!bestFA && !bestProspect) break;
+
+      const faScore = bestFA ? driverValue(bestFA) + (strength >= 90 ? bestFA.ovr * 0.08 : 0) : -999;
+      const teamIdn = TEAM_IDENTITIES?.[t.id] || { talent: 0.5 };
+      const prospectScore = bestProspect ? (bestProspect.ovr + (bestProspect.pot || bestProspect.ovr) * (0.2 + teamIdn.talent * 0.1)) : -999;
+
+      const pickFA = bestFA && (faScore >= prospectScore + 2 || !bestProspect || strength >= 88);
+
+      if (pickFA) {
         const idx = updatedDrivers.findIndex(x => x.id === bestFA.id);
         if (idx >= 0) {
-          updatedDrivers[idx] = { ...updatedDrivers[idx], teamId: t.id, contractEnd: newSeason + 1 };
+          const years = bestFA.ovr >= 90 ? 3 : bestFA.ovr >= 82 ? 2 : 1;
+          updatedDrivers[idx] = { ...updatedDrivers[idx], teamId: t.id, contractEnd: newSeason + years };
+          lineup.push(updatedDrivers[idx]);
           transitionNews.push(makeNews(
-            `${bestFA.name} Joins ${t.name}`,
-            `With limited options, ${t.name} bring in ${bestFA.name} (OVR ${bestFA.ovr}) for ${newSeason}.`,
+            `${bestFA.name} Signs for ${t.name}`,
+            `${t.name} have signed ${bestFA.name} (OVR ${bestFA.ovr}) on a deal through ${newSeason + years}.`,
             "Driver", 0
           ));
         }
       } else {
-        break;
+        const years = bestProspect.ovr >= 80 ? 2 : 1;
+        const newDriver = { ...bestProspect, teamId: t.id, contractEnd: newSeason + years };
+        updatedDrivers.push(newDriver);
+        availableProspects = availableProspects.filter(x => x.id !== bestProspect.id);
+        lineup.push(newDriver);
+        transitionNews.push(makeNews(
+          `${t.name} Promote ${bestProspect.name}`,
+          `${bestProspect.series} talent ${bestProspect.name} earns a seat at ${t.name} through ${newSeason + years}.`,
+          "Driver", 0
+        ));
       }
-      needed--;
     }
   });
 
-  // ── PHASE 3: Remaining free agents go to scouting pool ──
-  // Non-retired released drivers become available prospects for the player
-  const remainingFAs = updatedDrivers.filter(d => d.teamId === null && released.has(d.id) && !(d.age >= 38 && d.ovr < 77));
+  // Remaining free agents become scouting options
+  const remainingFAs = updatedDrivers.filter(d => d.teamId === null);
   remainingFAs.forEach(fa => {
-    // Add to prospects pool so player can sign them
     if (!availableProspects.find(p => p.id === fa.id)) {
       availableProspects.push({
         ...fa,
         series: "Free Agent",
-        salary: Math.max(1, Math.floor(fa.salary * 0.6)),
-        pot: fa.ovr + Math.floor(Math.random() * 5),
+        salary: Math.max(1, Math.floor(fa.salary * 0.8)),
+        pot: fa.pot || Math.min(96, fa.ovr + 4),
         teamId: null,
         contractEnd: null,
       });
@@ -594,11 +553,11 @@ function finaliseSeasonHistory(history, season, driverPoints, constructorPoints,
 function initGame(pid) {
   _newsId = 0;
   const pt = TEAMS.find(t => t.id === pid);
-  const drivers = F1_DRIVERS.map((d, i) => ({ ...d, id: i }));
+  const drivers = F1_DRIVERS.map((d, i) => ({ ...d, id: i, pot: d.pot || Math.min(98, d.ovr + (d.age <= 22 ? 12 : d.age <= 27 ? 7 : d.age <= 32 ? 3 : 1)) }));
   const myD = drivers.filter(d => d.teamId === pid);
   const startNews = genSeasonStart(pt, myD, 0);
   const effects = applyNewsEffects(startNews, { budget: 70, modifiers: [], team: pt, drivers });
-  const teamCars = {}; TEAMS.forEach(t => { teamCars[t.id] = t.car; });
+  const teamCars = {}; const teamCarProfiles = {}; TEAMS.forEach(t => { teamCars[t.id] = t.car; teamCarProfiles[t.id] = { aero: t.car, power: t.car, grip: t.car - 1, tyreWear: t.car - 2, reliability: t.car - 1, overall: t.car }; });
   return {
     team: pt, drivers, prospects: PROSPECTS.map((p, i) => ({ ...p, id: 100 + i, teamId: null, contractEnd: null })),
     budget: effects.budget, season: 2026, raceIndex: 0,
@@ -607,8 +566,9 @@ function initGame(pid) {
     qualiResults: null, raceResult: null, raceWeather: null, qualiWeather: null,
     revealCount: 0, raceRevealCount: 0,
     news: startNews, modifiers: effects.modifiers,
-    unreadNews: startNews.length, teamCars,
+    unreadNews: startNews.length, teamCars, teamCarProfiles,
     history: { totalWins: 0, totalPodiums: 0, totalPoles: 0, totalPoints: 0, totalRaces: 0, titles: { wdc: 0, wcc: 0 }, seasons: [], bestFinishes: [] },
+    driverSeasonStats: {}, driverCareer: {}, teamSeasonStats: {}, teamHistory: {},
     rivalry: null,
   };
 }

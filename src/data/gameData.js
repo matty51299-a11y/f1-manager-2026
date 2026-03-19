@@ -59,7 +59,36 @@ const PROSPECTS = [
   { name: "Ugo Ugochukwu", age: 18, ovr: 63, pace: 4, consistency: 2, wet: 2, series: "F3", salary: 1, pot: 87 },
   { name: "Noel León", age: 20, ovr: 65, pace: 3, consistency: 3, wet: 2, series: "F2", salary: 1, pot: 78 },
   { name: "Mari Boya", age: 20, ovr: 64, pace: 3, consistency: 3, wet: 2, series: "F2", salary: 1, pot: 76 },
+  { name: "Theo Pourchaire", age: 24, ovr: 77, pace: 4, consistency: 4, wet: 3, series: "Reserve", salary: 3, pot: 82 },
+  { name: "Felipe Drugovich", age: 26, ovr: 75, pace: 4, consistency: 3, wet: 3, series: "Reserve", salary: 2, pot: 79 },
+  { name: "Mick Schumacher", age: 27, ovr: 73, pace: 3, consistency: 3, wet: 3, series: "Free Agent", salary: 2, pot: 77 },
+  { name: "Nyck de Vries", age: 31, ovr: 72, pace: 3, consistency: 3, wet: 3, series: "Free Agent", salary: 2, pot: 74 },
+  { name: "Robert Shwartzman", age: 27, ovr: 74, pace: 3, consistency: 4, wet: 3, series: "Reserve", salary: 2, pot: 78 },
+  { name: "Frederik Vesti", age: 24, ovr: 71, pace: 3, consistency: 3, wet: 3, series: "Reserve", salary: 1, pot: 79 },
+  { name: "Ayumu Iwasa", age: 24, ovr: 70, pace: 4, consistency: 3, wet: 3, series: "F2", salary: 1, pot: 80 },
+  { name: "Jak Crawford", age: 21, ovr: 69, pace: 4, consistency: 3, wet: 3, series: "F2", salary: 1, pot: 82 },
+  { name: "Pepe Martí", age: 20, ovr: 66, pace: 4, consistency: 3, wet: 2, series: "F2", salary: 1, pot: 81 },
+  { name: "Sebastian Montoya", age: 21, ovr: 65, pace: 3, consistency: 3, wet: 2, series: "F3", salary: 1, pot: 79 },
+  { name: "Marcus Armstrong", age: 26, ovr: 74, pace: 3, consistency: 4, wet: 3, series: "IndyCar", salary: 2, pot: 78 },
+  { name: "Santino Ferrucci", age: 28, ovr: 72, pace: 3, consistency: 3, wet: 3, series: "IndyCar", salary: 2, pot: 75 },
+  { name: "Romain Grosjean", age: 40, ovr: 70, pace: 3, consistency: 3, wet: 3, series: "Veteran", salary: 2, pot: 70 },
+  { name: "Daniil Kvyat", age: 32, ovr: 71, pace: 3, consistency: 3, wet: 3, series: "Veteran", salary: 2, pot: 73 },
 ];
+
+
+const TEAM_IDENTITIES = {
+  mclaren: { dev: 0.9, talent: 0.8, volatility: 0.3, focus: "aero" },
+  ferrari: { dev: 0.85, talent: 0.95, volatility: 0.45, focus: "power" },
+  redbull: { dev: 1.0, talent: 0.9, volatility: 0.35, focus: "aero" },
+  mercedes: { dev: 0.9, talent: 0.85, volatility: 0.3, focus: "reliability" },
+  aston: { dev: 0.65, talent: 0.6, volatility: 0.5, focus: "grip" },
+  alpine: { dev: 0.55, talent: 0.55, volatility: 0.65, focus: "power" },
+  williams: { dev: 0.6, talent: 0.5, volatility: 0.45, focus: "aero" },
+  haas: { dev: 0.45, talent: 0.45, volatility: 0.7, focus: "reliability" },
+  audi: { dev: 0.7, talent: 0.65, volatility: 0.55, focus: "power" },
+  racingbulls: { dev: 0.7, talent: 0.75, volatility: 0.55, focus: "aero" },
+  cadillac: { dev: 0.55, talent: 0.5, volatility: 0.8, focus: "grip" },
+};
 
 const RACES_2026 = [
   { name: "Australian GP", circuit: "Albert Park", country: "AUS", baseLap: 78.5, laps: 58 },
@@ -94,4 +123,4 @@ const WEATHER_TYPES = [
   { id: "storm", label: "STORM", icon: "⛈️", chance: 0.1 },
 ];
 
-export { TEAMS, F1_DRIVERS, PROSPECTS, RACES_2026, POINTS, WEATHER_TYPES };
+export { TEAMS, F1_DRIVERS, PROSPECTS, TEAM_IDENTITIES, RACES_2026, POINTS, WEATHER_TYPES };
