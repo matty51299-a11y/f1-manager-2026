@@ -1,4 +1,4 @@
-import { TEAMS, F1_DRIVERS, PROSPECTS, POINTS, WEATHER_TYPES } from "../data/gameData";
+import { TEAMS, F1_DRIVERS, PROSPECTS, TEAM_IDENTITIES, POINTS, WEATHER_TYPES } from "../data/gameData";
 
 let _newsId = 0;
 function makeNews(title, body, category, round, effect = null) {
@@ -316,7 +316,8 @@ function aiTransfers(drivers, prospects, teamId, newSeason, transitionNews, driv
   const teamStrength = (tid) => {
     const cPts = constructorPoints?.[tid] || 0;
     const car = teamCars?.[tid] ?? TEAMS.find(t => t.id === tid)?.car ?? 75;
-    return car * 1.1 + cPts * 0.25;
+    const id = TEAM_IDENTITIES?.[tid] || { dev: 0.5, talent: 0.5 };
+    return car * (1.02 + id.dev * 0.1) + cPts * 0.25 + id.talent * 4;
   };
 
   const driverValue = (d) => {
@@ -373,7 +374,8 @@ function aiTransfers(drivers, prospects, teamId, newSeason, transitionNews, driv
       if (!bestFA && !bestProspect) break;
 
       const faScore = bestFA ? driverValue(bestFA) + (strength >= 90 ? bestFA.ovr * 0.08 : 0) : -999;
-      const prospectScore = bestProspect ? (bestProspect.ovr + (bestProspect.pot || bestProspect.ovr) * 0.25) : -999;
+      const teamIdn = TEAM_IDENTITIES?.[t.id] || { talent: 0.5 };
+      const prospectScore = bestProspect ? (bestProspect.ovr + (bestProspect.pot || bestProspect.ovr) * (0.2 + teamIdn.talent * 0.1)) : -999;
 
       const pickFA = bestFA && (faScore >= prospectScore + 2 || !bestProspect || strength >= 88);
 
@@ -551,11 +553,11 @@ function finaliseSeasonHistory(history, season, driverPoints, constructorPoints,
 function initGame(pid) {
   _newsId = 0;
   const pt = TEAMS.find(t => t.id === pid);
-  const drivers = F1_DRIVERS.map((d, i) => ({ ...d, id: i }));
+  const drivers = F1_DRIVERS.map((d, i) => ({ ...d, id: i, pot: d.pot || Math.min(98, d.ovr + (d.age <= 22 ? 12 : d.age <= 27 ? 7 : d.age <= 32 ? 3 : 1)) }));
   const myD = drivers.filter(d => d.teamId === pid);
   const startNews = genSeasonStart(pt, myD, 0);
   const effects = applyNewsEffects(startNews, { budget: 70, modifiers: [], team: pt, drivers });
-  const teamCars = {}; TEAMS.forEach(t => { teamCars[t.id] = t.car; });
+  const teamCars = {}; const teamCarProfiles = {}; TEAMS.forEach(t => { teamCars[t.id] = t.car; teamCarProfiles[t.id] = { aero: t.car, power: t.car, grip: t.car - 1, tyreWear: t.car - 2, reliability: t.car - 1, overall: t.car }; });
   return {
     team: pt, drivers, prospects: PROSPECTS.map((p, i) => ({ ...p, id: 100 + i, teamId: null, contractEnd: null })),
     budget: effects.budget, season: 2026, raceIndex: 0,
@@ -564,7 +566,7 @@ function initGame(pid) {
     qualiResults: null, raceResult: null, raceWeather: null, qualiWeather: null,
     revealCount: 0, raceRevealCount: 0,
     news: startNews, modifiers: effects.modifiers,
-    unreadNews: startNews.length, teamCars,
+    unreadNews: startNews.length, teamCars, teamCarProfiles,
     history: { totalWins: 0, totalPodiums: 0, totalPoles: 0, totalPoints: 0, totalRaces: 0, titles: { wdc: 0, wcc: 0 }, seasons: [], bestFinishes: [] },
     driverSeasonStats: {}, driverCareer: {}, teamSeasonStats: {}, teamHistory: {},
     rivalry: null,

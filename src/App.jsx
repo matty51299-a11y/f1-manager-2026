@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import TeamBadge from "./components/TeamBadge";
-import { TEAMS, F1_DRIVERS, RACES_2026, POINTS } from "./data/gameData";
+import { TEAMS, TEAM_IDENTITIES, F1_DRIVERS, RACES_2026, POINTS } from "./data/gameData";
 import { BG, BG2, BG3, BORDER, BORDER2, DIM, DIM2, DIM3, TEXT, TEXT2, GOLD, BLUE, BLUE2, CAT_COLORS } from "./styles/theme";
 import {
   pick,
@@ -161,7 +161,7 @@ export default function F1Manager() {
   }
 
   /* ── GAME LOGIC ── */
-  const { team, drivers, prospects, budget, season, raceIndex, raceResults, driverPoints, constructorPoints, tab, weekendPhase, qualiResults, raceResult, qualiWeather, revealCount, raceRevealCount, news, modifiers, unreadNews, teamCars, history, rivalry, driverSeasonStats, driverCareer, teamSeasonStats, teamHistory } = game;
+  const { team, drivers, prospects, budget, season, raceIndex, raceResults, driverPoints, constructorPoints, tab, weekendPhase, qualiResults, raceResult, qualiWeather, revealCount, raceRevealCount, news, modifiers, unreadNews, teamCars, teamCarProfiles, history, rivalry, driverSeasonStats, driverCareer, teamSeasonStats, teamHistory } = game;
   const myDrivers = drivers.filter(d => d.teamId === team.id);
   const allActive = drivers.filter(d => d.teamId !== null);
   const currentRace = RACES_2026[raceIndex];
@@ -212,7 +212,7 @@ export default function F1Manager() {
             const baseRivalry = updateRivalry(ncp, ndp, team, p.drivers, p.rivalry);
             const newRivalry = updateRivalryPostRace(baseRivalry, rr, team.id);
             const profileUpdates = updateProfileStats(p, rr, ndp, ncp, p.season, isLast);
-            return { ...p, driverPoints: ndp, constructorPoints: ncp, weekendPhase: "race_done", raceResults: [...p.raceResults, rr], news: [...allNew, ...p.news], budget: effects.budget, modifiers: ticked, teamCars: regChange.teamCars, history: finalisedHist, rivalry: newRivalry, driverSeasonStats: profileUpdates.driverSeason, driverCareer: profileUpdates.driverCareer, teamSeasonStats: profileUpdates.teamSeason, teamHistory: profileUpdates.teamHistory };
+            return { ...p, driverPoints: ndp, constructorPoints: ncp, weekendPhase: "race_done", raceResults: [...p.raceResults, rr], news: [...allNew, ...p.news], budget: effects.budget, modifiers: ticked, teamCars: regChange.teamCars, teamCarProfiles: p.teamCarProfiles, history: finalisedHist, rivalry: newRivalry, driverSeasonStats: profileUpdates.driverSeason, driverCareer: profileUpdates.driverCareer, teamSeasonStats: profileUpdates.teamSeason, teamHistory: profileUpdates.teamHistory };
           });
         }, 400);
       }
@@ -234,13 +234,30 @@ export default function F1Manager() {
       // Process drivers: age them, handle OVR growth/decline
       const agedDrivers = p.drivers.map(d => {
         const newAge = d.age + 1;
+        const perfPts = p.driverPoints[d.id] || 0;
+        const pot = d.pot || Math.min(98, d.ovr + 4);
         let ovrChange = 0;
-        if (newAge <= 23) ovrChange = Math.floor(Math.random() * 3) + 1;
-        else if (newAge <= 27) ovrChange = Math.floor(Math.random() * 2);
-        else if (newAge >= 36) ovrChange = -(Math.floor(Math.random() * 3) + 1);
-        else if (newAge >= 33) ovrChange = -Math.floor(Math.random() * 2);
+
+        if (newAge <= 21) ovrChange += pick([0, 1, 1, 2]);
+        else if (newAge <= 24) ovrChange += pick([-1, 0, 1, 1]);
+        else if (newAge <= 29) ovrChange += pick([-1, 0, 0, 1]);
+        else if (newAge <= 33) ovrChange += pick([-2, -1, 0, 0]);
+        else ovrChange += pick([-3, -2, -1, 0]);
+
+        if (pot - d.ovr >= 8 && newAge <= 25) ovrChange += maybe(0.45) ? 1 : 0;
+        if (pot - d.ovr <= 2 && newAge <= 25) ovrChange += maybe(0.25) ? -1 : 0; // stalled development
+
+        if (perfPts >= 180) ovrChange += 2;
+        else if (perfPts >= 90) ovrChange += 1;
+        else if (perfPts <= 5 && newAge >= 30) ovrChange -= 1;
+
+        if (newAge <= 24 && pot >= 90 && maybe(0.12)) ovrChange += 2; // breakout
+        if (newAge >= 34 && maybe(0.15)) ovrChange -= 1; // sudden decline
+
+        ovrChange = Math.max(-4, Math.min(4, ovrChange));
         const newOvr = Math.max(55, Math.min(99, d.ovr + ovrChange));
-        return { ...d, age: newAge, ovr: newOvr };
+        const newPot = Math.max(newOvr + 1, Math.min(99, pot + (newAge <= 22 && maybe(0.3) ? 1 : 0) - (newAge >= 31 ? 1 : 0)));
+        return { ...d, age: newAge, ovr: newOvr, pot: newPot };
       });
 
       // Contracts tick down each year; expired contracts become free agents for market phase
@@ -255,32 +272,51 @@ export default function F1Manager() {
       });
 
       // Refresh some prospects: remove signed ones, age them, add potential new F2 grads
-      const refreshedProspects = p.prospects.map(pr => {
-        const newAge = pr.age + 1;
-        const ovrGain = Math.floor(Math.random() * 3) + 1;
-        return { ...pr, age: newAge, ovr: Math.min(pr.pot, pr.ovr + ovrGain) };
-      });
+      const refreshedProspects = p.prospects
+        .map(pr => {
+          const newAge = pr.age + 1;
+          const trend = newAge <= 23 ? pick([0, 1, 1, 2]) : newAge <= 28 ? pick([0, 1]) : pick([-1, 0, 0]);
+          const newOvr = Math.max(55, Math.min(pr.pot, pr.ovr + trend));
+          return { ...pr, age: newAge, ovr: newOvr };
+        })
+        .filter(pr => !(pr.age >= 34 && pr.ovr < 72));
 
-      // Fresh prospect injection every season
-      const freshProspects = [
-        { name: pick(["Lucas Martín", "Tom Verschoor", "Kacper Nowak", "Yuto Tanaka", "Matteo Rossi", "Elias Berger", "Hugo Petit", "Nils Stenberg"]), age: 18, ovr: 60 + Math.floor(Math.random() * 8), pace: pick([3, 4]), consistency: pick([2, 3]), wet: pick([2, 3]), series: "F3", salary: 1, pot: 75 + Math.floor(Math.random() * 13), id: 200 + newSeason + Math.floor(Math.random() * 100), teamId: null, contractEnd: null },
-        { name: pick(["André Silva", "Finn McCarthy", "Oscar Lindqvist", "Kai Taniguchi", "Leo Fernández", "Max Schultz", "Ravi Patel", "Cillian Byrne"]), age: 19, ovr: 62 + Math.floor(Math.random() * 8), pace: pick([3, 4]), consistency: pick([2, 3]), wet: pick([2, 3]), series: "F2", salary: 1, pot: 76 + Math.floor(Math.random() * 12), id: 300 + newSeason + Math.floor(Math.random() * 100), teamId: null, contractEnd: null },
-      ];
+      // Fresh prospect + market injection every season (deeper scouting ecosystem)
+      const namesA = ["Lucas Martín", "Tom Verschoor", "Kacper Nowak", "Yuto Tanaka", "Matteo Rossi", "Elias Berger", "Hugo Petit", "Nils Stenberg", "Sami Al Khatib", "Noah Carlsen"];
+      const namesB = ["André Silva", "Finn McCarthy", "Oscar Lindqvist", "Kai Taniguchi", "Leo Fernández", "Max Schultz", "Ravi Patel", "Cillian Byrne", "Theo Vasseur", "Ivan Petrov"];
+      const freshProspects = Array.from({ length: 8 }, (_, i) => {
+        const isF3 = i < 3;
+        const isReserve = i >= 5;
+        const baseAge = isF3 ? 18 : isReserve ? pick([24, 25, 26, 31]) : 19;
+        const series = isF3 ? "F3" : isReserve ? pick(["Reserve", "Veteran", "Free Agent"]) : "F2";
+        const baseOvr = isF3 ? 60 + Math.floor(Math.random() * 7) : isReserve ? 70 + Math.floor(Math.random() * 8) : 63 + Math.floor(Math.random() * 9);
+        const pot = Math.min(96, baseOvr + (isReserve ? 6 : 12) + Math.floor(Math.random() * 8));
+        return { name: pick(isF3 ? namesA : namesB), age: baseAge, ovr: baseOvr, pace: pick([3, 4]), consistency: pick([2, 3, 4]), wet: pick([2, 3, 4]), series, salary: Math.max(1, Math.round(baseOvr / 28)), pot, id: 200 + newSeason * 10 + i + Math.floor(Math.random() * 500), teamId: null, contractEnd: null };
+      });
       const allProspects = [...refreshedProspects, ...freshProspects];
 
       // Car performance evolution: teams shuffle between seasons
       // Bottom teams improve more (regulation catch-up), top teams regress slightly
       const newTeamCars = {};
+      const newCarProfiles = {};
+      const prevProfiles = p.teamCarProfiles || {};
       TEAMS.forEach(t => {
-        const oldCar = p.teamCars?.[t.id] ?? t.car;
-        // Mean reversion: pull toward 80
-        const reversion = (80 - oldCar) * 0.15;
-        // Random development: ±3
-        const dev = (Math.random() - 0.5) * 6;
-        // Better finishers get slight boost from prize money investment
-        const tCPos = cStandings.findIndex(s => s.team?.id === t.id);
-        const finishBonus = tCPos >= 0 ? (11 - tCPos) * 0.2 : 0;
-        newTeamCars[t.id] = Math.max(65, Math.min(98, Math.round(oldCar + reversion + dev + finishBonus)));
+        const idn = TEAM_IDENTITIES[t.id] || { dev: 0.55, talent: 0.5, volatility: 0.5, focus: "aero" };
+        const oldProfile = prevProfiles[t.id] || { aero: t.car, power: t.car, grip: t.car - 1, tyreWear: t.car - 2, reliability: t.car - 1, overall: t.car };
+        const tCPos = cStandings.findIndex(s => s.team?.id === t.id) + 1;
+        const finishBonus = tCPos > 0 ? (12 - tCPos) * 0.12 : 0;
+        const catchup = (80 - oldProfile.overall) * 0.08;
+        const attrs = ["aero", "power", "grip", "tyreWear", "reliability"];
+        const evolved = {};
+        attrs.forEach(attr => {
+          const focusBonus = attr === idn.focus ? 0.7 : 0;
+          const rnd = (Math.random() - 0.5) * (1.8 + idn.volatility * 1.6);
+          const delta = idn.dev * 0.9 + finishBonus + catchup + focusBonus + rnd;
+          evolved[attr] = Math.max(62, Math.min(99, Math.round((oldProfile[attr] ?? oldProfile.overall) + delta)));
+        });
+        evolved.overall = Math.round((evolved.aero + evolved.power + evolved.grip + evolved.tyreWear + evolved.reliability) / 5);
+        newCarProfiles[t.id] = evolved;
+        newTeamCars[t.id] = evolved.overall;
       });
 
       // AI TRANSFERS — other teams shuffle their lineups
@@ -291,7 +327,7 @@ export default function F1Manager() {
 
       // Retired drivers check (over 42 and low OVR)
       const finalDrivers = postAiDrivers.map(d => {
-        if (d.age >= 42 && d.ovr < 78 && d.teamId !== team.id) {
+        if (((d.age >= 44) || (d.age >= 39 && d.ovr < 74)) && d.teamId !== team.id) {
           return { ...d, teamId: null }; // they retire from the grid
         }
         return d;
@@ -367,6 +403,20 @@ export default function F1Manager() {
         ));
       }
 
+      const devSwing = TEAMS.map(t => ({ team: t, diff: (newTeamCars[t.id] || 0) - (p.teamCars?.[t.id] || t.car) })).sort((a, b) => b.diff - a.diff);
+      if (devSwing[0]?.diff > 0) {
+        transitionNews.push(makeNews(
+          `Development Movers: ${devSwing[0].team.name}`,
+          `${devSwing[0].team.name} made the biggest winter jump (+${devSwing[0].diff}). ${devSwing[1] ? `${devSwing[1].team.name} also improved by +${devSwing[1].diff}.` : ""}`,
+          "Development", 0
+        ));
+      }
+      transitionNews.push(makeNews(
+        `New Talent Class Arrives`,
+        `${freshProspects.length} new prospects enter the market (${freshProspects.filter(p => p.series === "F3").length} from F3, ${freshProspects.filter(p => p.series === "F2").length} from F2, ${freshProspects.filter(p => p.series !== "F2" && p.series !== "F3").length} experienced options).`,
+        "Driver", 0
+      ));
+
       const effects = applyNewsEffects(transitionNews, { budget: baseBudget + prizeMoney, modifiers: [], team, drivers: finalDrivers });
 
       return {
@@ -389,6 +439,7 @@ export default function F1Manager() {
         unreadNews: transitionNews.length,
         tab: "news",
         teamCars: newTeamCars,
+        teamCarProfiles: newCarProfiles,
         rivalry: null, // reset rivalry for new season
         // history carries via ...p
       };
@@ -493,7 +544,7 @@ export default function F1Manager() {
           {tab === "news" && <NewsTab news={news} />}
           {tab === "squad" && <SquadTab {...{ myDrivers, team, driverPoints, releaseDriver, season }} />}
           {tab === "scouting" && <ScoutingTab {...{ prospects, budget, signProspect, myDrivers, team }} />}
-          {tab === "grid" && <GridTab {...{ drivers, driverPoints, team, season, teamCars }} />}
+          {tab === "grid" && <GridTab {...{ drivers, driverPoints, team, season, teamCars, teamCarProfiles }} />}
           {tab === "profiles" && <ProfilesTab {...{ drivers, teams: TEAMS, team, driverPoints, constructorPoints, season, driverSeasonStats, driverCareer, teamSeasonStats, teamHistory, teamCars }} />}
           {tab === "contracts" && <ContractsTab {...{ drivers, season, team, driverPoints }} />}
           {tab === "standings" && <StandingsTab {...{ driverStandings, constructorStandings, team }} />}
@@ -813,7 +864,7 @@ function ScoutingTab({ prospects, budget, signProspect, myDrivers, team }) {
   </div>);
 }
 
-function GridTab({ drivers, driverPoints, team, season, teamCars }) {
+function GridTab({ drivers, driverPoints, team, season, teamCars, teamCarProfiles }) {
   return (<div><Sec>{season} F1 GRID</Sec>
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, maxWidth: 850 }}>
       {TEAMS.map(t => {
@@ -827,6 +878,9 @@ function GridTab({ drivers, driverPoints, team, season, teamCars }) {
             <div style={{ flex: 1, height: 4, background: "rgba(0,0,0,0.15)", borderRadius: 2, maxWidth: 80 }}><div style={{ width: `${((carVal - 60) / 40) * 100}%`, height: "100%", background: carCol, borderRadius: 2 }} /></div>
             <span style={{ fontSize: 10, color: carCol, fontWeight: 700 }}>{carVal}</span>
           </div>
+          {teamCarProfiles?.[t.id] && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, marginBottom: 6 }}>
+            {["aero", "power", "grip", "tyreWear", "reliability"].map(k => <div key={k} style={{ fontSize: 8, color: DIM2 }}>{k.toUpperCase().replace("TYREWEAR", "TYRE")} <span style={{ color: TEXT2 }}>{teamCarProfiles[t.id][k]}</span></div>)}
+          </div>}
           {td.map(d => (<div key={d.id} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}><span style={{ color: mine ? "#fff" : TEXT2 }}>{d.name}</span><div style={{ display: "flex", gap: 12 }}><span style={{ fontSize: 10, color: DIM }}>OVR {d.ovr}</span><span style={{ fontSize: 10, color: "#E2B53A", fontWeight: 700 }}>{driverPoints[d.id] || 0} pts</span></div></div>))}
         </div>);
       })}
