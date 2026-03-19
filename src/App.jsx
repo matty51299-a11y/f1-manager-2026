@@ -136,7 +136,7 @@ export default function F1Manager() {
   /* ── TEAM SELECT ── */
   if (!game) {
     return (
-      <div style={{ minHeight: "100vh", background: BG, fontFamily: "'Courier New', monospace", color: TEXT, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 40 }}>
+      <div style={{ height: "100dvh", minHeight: "100vh", background: BG, fontFamily: "'Courier New', monospace", color: TEXT, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 40 }}>
         <div style={{ textAlign: "center", marginBottom: 48 }}>
           <div style={{ fontSize: 13, letterSpacing: 8, color: BLUE, marginBottom: 12, fontWeight: 700 }}>FORMULA ONE</div>
           <h1 style={{ fontSize: 52, fontWeight: 900, letterSpacing: -2, margin: 0, lineHeight: 1, color: "#fff", fontFamily: "'Arial Black', 'Helvetica Neue', sans-serif" }}>PIT WALL</h1>
@@ -432,8 +432,8 @@ export default function F1Manager() {
   ];
 
   return (
-    <div style={{ minHeight: "100vh", background: BG, color: TEXT, fontFamily: "'Courier New', monospace", display: "flex", fontSize: 13 }}>
-      <div style={{ width: 190, minHeight: "100vh", background: BG2, borderRight: `1px solid ${BORDER}`, display: "flex", flexDirection: "column", flexShrink: 0 }}>
+    <div style={{ height: "100dvh", minHeight: "100vh", width: "100vw", overflow: "hidden", background: BG, color: TEXT, fontFamily: "'Courier New', monospace", display: "flex", fontSize: 13 }}>
+      <div style={{ width: 190, height: "100%", background: BG2, borderRight: `1px solid ${BORDER}`, display: "flex", flexDirection: "column", flexShrink: 0 }}>
         <div style={{ padding: "18px 14px 20px", borderBottom: `1px solid ${BORDER}` }}>
           <div style={{ fontSize: 11, letterSpacing: 4, color: BLUE, fontWeight: 700, marginBottom: 2 }}>PIT WALL</div>
           <div style={{ fontSize: 10, color: DIM2 }}>{season} · R{Math.min(raceIndex + 1, RACES_2026.length)}/{RACES_2026.length}</div>
@@ -471,7 +471,7 @@ export default function F1Manager() {
         </div>
       </div>
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", borderBottom: `1px solid ${BORDER}`, background: BG2, flexWrap: "wrap", gap: 12 }}>
           <div style={{ display: "flex", gap: 28, alignItems: "center" }}>
             <TS label="WCC" value={myCP} sub={cRank ? `P${cRank}` : "—"} color={team.color} />
@@ -485,7 +485,7 @@ export default function F1Manager() {
           </div>}
           {currentRace && <div style={{ fontSize: 10, color: DIM, letterSpacing: 1 }}>R{raceIndex + 1} · {currentRace.name}</div>}
         </div>
-        <div style={{ padding: 20, flex: 1, overflow: "auto" }}>
+        <div style={{ padding: 20, flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden" }}>
           {tab === "race" && <RaceTab {...{ currentRace, weekendPhase, qualiResults, qualiWeather, raceResult, raceRevealCount, revealCount, startQuali, startRace, nextWeekend, startNextSeason, team, raceIndex, driverStandings, constructorStandings, season, myDrivers }} />}
           {tab === "news" && <NewsTab news={news} />}
           {tab === "squad" && <SquadTab {...{ myDrivers, team, driverPoints, releaseDriver, season }} />}
