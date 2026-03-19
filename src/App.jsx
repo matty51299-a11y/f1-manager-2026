@@ -31,6 +31,9 @@ function dots(n, max = 5) { return Array.from({ length: max }, (_, i) => (<span 
 function potBar(pot) { const pct = ((pot - 60) / 40) * 100; const col = pot >= 85 ? "#22C55E" : pot >= 80 ? "#E2B53A" : pot >= 75 ? "#F97316" : "#aaa"; return (<div style={{ display: "flex", alignItems: "center", gap: 6 }}><div style={{ width: 50, height: 4, background: "rgba(0,0,0,0.2)", borderRadius: 2 }}><div style={{ width: `${Math.max(pct, 5)}%`, height: "100%", background: col, borderRadius: 2 }} /></div><span style={{ fontSize: 10, color: col, fontWeight: 700 }}>{pot}</span></div>); }
 function Sec({ children }) { return <div style={{ fontSize: 10, letterSpacing: 3, color: "#fff", fontWeight: 700, marginBottom: 14, paddingBottom: 6, borderBottom: `1px solid ${BLUE}33` }}>{children}</div>; }
 function TS({ label, value, sub, color }) { return (<div><div style={{ fontSize: 9, color: DIM, letterSpacing: 2, marginBottom: 1 }}>{label}</div><div style={{ display: "flex", alignItems: "baseline", gap: 4 }}><span style={{ fontSize: 20, fontWeight: 900, color: color || "#fff", fontFamily: "'Arial Black', sans-serif" }}>{value}</span>{sub && <span style={{ fontSize: 9, color: DIM }}>{sub}</span>}</div></div>); }
+function DashCard({ title, children, accent }) {
+  return <div style={{ background: BG3, border: `1px solid ${accent ? accent + "55" : BORDER}`, padding: "12px 14px", minHeight: 88 }}><div style={{ fontSize: 8, color: accent || DIM, letterSpacing: 2, marginBottom: 6, fontWeight: 700 }}>{title}</div><div style={{ fontSize: 11, color: TEXT2, lineHeight: 1.5 }}>{children}</div></div>;
+}
 const blankSeasonStats = () => ({ points: 0, wins: 0, podiums: 0, poles: 0, races: 0, finishes: 0, sumFinish: 0, dnfs: 0 });
 const avgFinish = (st) => (st.finishes > 0 ? (st.sumFinish / st.finishes).toFixed(2) : "—");
 function ensureProfileData(state) {
@@ -486,7 +489,7 @@ export default function F1Manager() {
           {currentRace && <div style={{ fontSize: 10, color: DIM, letterSpacing: 1 }}>R{raceIndex + 1} · {currentRace.name}</div>}
         </div>
         <div style={{ padding: 20, flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden" }}>
-          {tab === "race" && <RaceTab {...{ currentRace, weekendPhase, qualiResults, qualiWeather, raceResult, raceRevealCount, revealCount, startQuali, startRace, nextWeekend, startNextSeason, team, raceIndex, driverStandings, constructorStandings, season, myDrivers }} />}
+          {tab === "race" && <RaceTab {...{ currentRace, weekendPhase, qualiResults, qualiWeather, raceResult, raceRevealCount, revealCount, startQuali, startRace, nextWeekend, startNextSeason, team, raceIndex, driverStandings, constructorStandings, season, myDrivers, rivalry }} />}
           {tab === "news" && <NewsTab news={news} />}
           {tab === "squad" && <SquadTab {...{ myDrivers, team, driverPoints, releaseDriver, season }} />}
           {tab === "scouting" && <ScoutingTab {...{ prospects, budget, signProspect, myDrivers, team }} />}
@@ -537,7 +540,7 @@ function NewsTab({ news }) {
 /* ═══════════════════════════════════════════
    RACE WEEKEND TAB
    ═══════════════════════════════════════════ */
-function RaceTab({ currentRace, weekendPhase, qualiResults, qualiWeather, raceResult, raceRevealCount, revealCount, startQuali, startRace, nextWeekend, startNextSeason, team, raceIndex, driverStandings, constructorStandings, season, myDrivers }) {
+function RaceTab({ currentRace, weekendPhase, qualiResults, qualiWeather, raceResult, raceRevealCount, revealCount, startQuali, startRace, nextWeekend, startNextSeason, team, raceIndex, driverStandings, constructorStandings, season, myDrivers, rivalry }) {
   if (raceIndex >= RACES_2026.length) {
     const cPos = constructorStandings.findIndex(s => s.team?.id === team.id) + 1;
     const myDStandings = myDrivers.map(d => {
@@ -606,6 +609,10 @@ function RaceTab({ currentRace, weekendPhase, qualiResults, qualiWeather, raceRe
     { id: "quali", label: "QUALIFYING", done: ["race_reveal", "race_done"].includes(weekendPhase) || (weekendPhase === "quali_reveal" && revealCount >= (qualiResults?.length || 0)) },
     { id: "race", label: "RACE", done: weekendPhase === "race_done" },
   ];
+  const myCPoints = constructorStandings.find(s => s.team?.id === team.id)?.pts || 0;
+  const leaderPoints = constructorStandings[0]?.pts || 0;
+  const gapToLead = leaderPoints - myCPoints;
+  const projected = myDrivers.map(d => ({ ...d, projection: Math.round((d.ovr * 0.65) + (d.pace + d.consistency + d.wet) * 2.4) })).sort((a, b) => b.projection - a.projection);
 
   return (
     <div>
@@ -626,7 +633,32 @@ function RaceTab({ currentRace, weekendPhase, qualiResults, qualiWeather, raceRe
         </div>
       </div>
 
-      {weekendPhase === "preview" && (<div style={{ textAlign: "center", padding: "40px 0" }}><div style={{ fontSize: 11, color: DIM, letterSpacing: 2, marginBottom: 20 }}>LIGHTS OUT AWAITS</div><button onClick={startQuali} style={{ padding: "14px 48px", background: team.color, color: "#fff", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 800, letterSpacing: 3, fontFamily: "inherit" }}>BEGIN QUALIFYING →</button></div>)}
+      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12, marginBottom: 18, alignItems: "stretch" }}>
+        <div style={{ background: BG3, border: `1px solid ${BORDER}`, padding: "18px 20px" }}>
+          {weekendPhase === "preview" ? (
+            <div style={{ textAlign: "center", padding: "20px 0" }}>
+              <div style={{ fontSize: 11, color: DIM, letterSpacing: 2, marginBottom: 14 }}>LIGHTS OUT AWAITS</div>
+              <button onClick={startQuali} style={{ padding: "14px 48px", background: team.color, color: "#fff", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 800, letterSpacing: 3, fontFamily: "inherit" }}>BEGIN QUALIFYING →</button>
+            </div>
+          ) : (
+            <div style={{ fontSize: 11, color: TEXT2, lineHeight: 1.6 }}>
+              <div style={{ fontSize: 9, color: DIM, letterSpacing: 2, marginBottom: 8 }}>WEEKEND STORYLINE</div>
+              {weekendPhase === "quali_reveal" ? `Qualifying is underway at ${currentRace.circuit}. Track position is critical here and could define your race trajectory.` : `Race day at ${currentRace.name}: championship pressure is building with ${RACES_2026.length - raceIndex - 1} rounds after this.`}
+            </div>
+          )}
+        </div>
+        <div style={{ display: "grid", gap: 8 }}>
+          <DashCard title="CIRCUIT INFO" accent={BLUE}>{currentRace.circuit} · {currentRace.laps} laps</DashCard>
+          <DashCard title="CHAMPIONSHIP" accent="#E2B53A">{gapToLead > 0 ? `${gapToLead} pts behind P1` : `Leading by ${Math.abs(gapToLead)} pts`} · {constructorStandings.findIndex(s => s.team?.id === team.id) + 1 > 0 ? `P${constructorStandings.findIndex(s => s.team?.id === team.id) + 1}` : "No rank yet"}</DashCard>
+          <DashCard title="RIVALRY" accent="#F87171">{rivalry?.rivalName ? `${rivalry.rivalName} (${rivalry.gap >= 0 ? "+" : ""}${rivalry.gap})` : "Rivalry will appear once standings settle."}</DashCard>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(120px, 1fr))", gap: 8, marginBottom: 18, maxWidth: 900 }}>
+        <DashCard title="PROJECTED LEAD" accent={team.color}>{projected[0] ? `${projected[0].name.split(" ").pop()} (${projected[0].projection})` : "—"}</DashCard>
+        <DashCard title="TEAM EXPECTATION" accent="#4ADE80">{myDrivers.length >= 2 ? "Target: double points finish" : "Sign a second driver to maximize points."}</DashCard>
+        <DashCard title="CONDITIONS" accent="#60A5FA">{weekendPhase === "quali_reveal" ? (qualiWeather?.label || "Forecast pending") : (raceResult?.weather?.label || "Dry-biased conditions")}</DashCard>
+      </div>
 
       {weekendPhase === "quali_reveal" && qualiResults && (
         <div>
@@ -733,6 +765,13 @@ function SquadTab({ myDrivers, team, driverPoints, releaseDriver, season }) {
       ))}
     </div>
     {myDrivers.length < 2 && <div style={{ marginTop: 16, padding: 14, background: "rgba(226,181,58,0.08)", border: "1px solid rgba(226,181,58,0.3)", color: "#E2B53A", fontSize: 11 }}>Need 2 drivers. Visit Scouting.</div>}
+    <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "repeat(5, minmax(120px, 1fr))", gap: 8, maxWidth: 900 }}>
+      <DashCard title="TEAM RATING" accent={team.color}>{Math.round((myDrivers.reduce((s, d) => s + d.ovr, 0) / Math.max(1, myDrivers.length)))} OVR AVG</DashCard>
+      <DashCard title="BUDGET STATUS" accent="#E2B53A">Use header budget + contract costs to manage next season flexibility.</DashCard>
+      <DashCard title="CAR STRENGTH" accent="#4ADE80">Monitor sidebar car rating to match driver quality.</DashCard>
+      <DashCard title="CONTRACT RISK" accent="#F87171">{myDrivers.filter(d => (d.contractEnd - season) <= 1).length} driver(s) expiring within 1 year.</DashCard>
+      <DashCard title="SEASON POINTS" accent="#60A5FA">{myDrivers.reduce((s, d) => s + (driverPoints[d.id] || 0), 0)} total points from your lineup.</DashCard>
+    </div>
   </div>);
 }
 
@@ -745,6 +784,12 @@ function ScoutingTab({ prospects, budget, signProspect, myDrivers, team }) {
     {!canSign && <div style={{ marginBottom: 16, padding: 12, background: BG3, border: `1px solid ${BORDER}`, color: TEXT2, fontSize: 11 }}>Squad full. Release a driver first.</div>}
     <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
       {["all", "F2", "F3", "IndyCar", "Free Agent"].map(f => (<button key={f} onClick={() => setFilter(f)} style={{ padding: "5px 14px", background: filter === f ? "rgba(0,0,0,0.15)" : "transparent", border: `1px solid ${filter === f ? BORDER2 : BORDER}`, color: filter === f ? "#fff" : DIM, cursor: "pointer", fontSize: 10, fontFamily: "inherit", letterSpacing: 1, fontWeight: filter === f ? 700 : 400 }}>{f === "all" ? "ALL" : f.toUpperCase()}</button>))}
+    </div>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(140px, 1fr))", gap: 8, marginBottom: 14 }}>
+      <DashCard title="BEST AVAILABLE" accent="#E2B53A">{sorted[0] ? `${sorted[0].name} · OVR ${sorted[0].ovr}` : "No candidates"}</DashCard>
+      <DashCard title="HIGHEST POTENTIAL" accent="#C084FC">{sorted.length > 0 ? `${[...sorted].sort((a,b)=>b.pot-a.pot)[0].name} · POT ${[...sorted].sort((a,b)=>b.pot-a.pot)[0].pot}` : "No candidates"}</DashCard>
+      <DashCard title="BEST VALUE" accent="#4ADE80">{sorted.length > 0 ? `${[...sorted].sort((a,b)=>(a.salary/(a.ovr||1))-(b.salary/(b.ovr||1)))[0].name} · $${[...sorted].sort((a,b)=>(a.salary/(a.ovr||1))-(b.salary/(b.ovr||1)))[0].salary}M` : "No candidates"}</DashCard>
+      <DashCard title="LINEUP COMPARISON" accent={team.color}>{myDrivers.length > 0 && sorted[0] ? `${sorted[0].ovr - Math.min(...myDrivers.map(d=>d.ovr)) >= 0 ? "+" : ""}${sorted[0].ovr - Math.min(...myDrivers.map(d=>d.ovr))} vs weaker current driver` : "Sign drivers to unlock comparison"}</DashCard>
     </div>
     <div style={{ overflowX: "auto" }}><table style={{ width: "100%", maxWidth: 850, borderCollapse: "collapse" }}>
       <thead><tr style={{ borderBottom: `1px solid ${BORDER2}` }}>{["DRIVER", "SERIES", "AGE", "OVR", "POTENTIAL", "PACE", "CON", "WET", "COST", ""].map(h => (<th key={h} style={{ textAlign: "left", padding: "7px 8px", fontSize: 8, color: DIM, letterSpacing: 2, fontWeight: 600 }}>{h}</th>))}</tr></thead>
@@ -981,14 +1026,26 @@ function ContractsTab({ drivers, season, team, driverPoints }) {
 
 function StandingsTab({ driverStandings, constructorStandings, team }) {
   if (driverStandings.length === 0) return <div style={{ color: DIM, padding: 40, textAlign: "center" }}>Complete a race first.</div>;
-  return (<div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 28, maxWidth: 880 }}>
+  const myTeam = constructorStandings.find(s => s.team?.id === team.id);
+  const myPos = constructorStandings.findIndex(s => s.team?.id === team.id) + 1;
+  const leadPts = constructorStandings[0]?.pts || 0;
+  const gap = leadPts - (myTeam?.pts || 0);
+  return (<div>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(120px, 1fr))", gap: 8, maxWidth: 980, marginBottom: 14 }}>
+      <DashCard title="YOUR POSITION" accent={team.color}>P{myPos || "—"}</DashCard>
+      <DashCard title="POINTS" accent="#E2B53A">{myTeam?.pts || 0}</DashCard>
+      <DashCard title="GAP TO LEADER" accent="#F87171">{gap > 0 ? `-${gap}` : "Level / Leading"}</DashCard>
+      <DashCard title="RIVAL TEAM" accent="#60A5FA">{constructorStandings[Math.max(0, myPos - 2)]?.team?.name || "TBD"}</DashCard>
+      <DashCard title="FORM NOTE" accent="#4ADE80">{myPos <= 3 ? "Title fight active" : myPos <= 6 ? "Strong midfield battle" : "Recovery phase"}</DashCard>
+    </div>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 28, maxWidth: 980 }}>
     <div><Sec>DRIVERS'</Sec><table style={{ width: "100%", borderCollapse: "collapse" }}><tbody>
       {driverStandings.map((s, i) => { const mine = s.driver?.teamId === team.id; return (<tr key={s.driver?.id} style={{ borderBottom: `1px solid ${BORDER}`, background: mine ? `${team.color}25` : "transparent" }}><td style={{ padding: "6px 8px", color: i < 3 ? BLUE : DIM, fontWeight: 700, width: 28 }}>{i + 1}</td><td style={{ padding: "6px 8px" }}><span style={{ color: mine ? "#fff" : TEXT, fontWeight: mine ? 800 : 400 }}>{s.driver?.name}</span> <TeamBadge teamId={s.driver?.teamId} size={12} /></td><td style={{ padding: "6px 8px", textAlign: "right", color: "#E2B53A", fontWeight: 700 }}>{s.pts}</td></tr>); })}
     </tbody></table></div>
     <div><Sec>CONSTRUCTORS'</Sec><table style={{ width: "100%", borderCollapse: "collapse" }}><tbody>
       {constructorStandings.map((s, i) => { const mine = s.team?.id === team.id; return (<tr key={s.team?.id} style={{ borderBottom: `1px solid ${BORDER}`, background: mine ? `${team.color}25` : "transparent" }}><td style={{ padding: "6px 8px", color: i < 3 ? BLUE : DIM, fontWeight: 700, width: 28 }}>{i + 1}</td><td style={{ padding: "6px 8px" }}><span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><TeamBadge teamId={s.team?.id} size={16} /><span style={{ color: mine ? "#fff" : TEXT, fontWeight: mine ? 800 : 400 }}>{s.team?.name}</span></span></td><td style={{ padding: "6px 8px", textAlign: "right", color: "#E2B53A", fontWeight: 700 }}>{s.pts}</td></tr>); })}
     </tbody></table></div>
-  </div>);
+  </div></div>);
 }
 
 
@@ -997,7 +1054,7 @@ function HistoryTab({ history, rivalry }) {
   return (
     <div>
       <Sec>ALL-TIME RECORDS</Sec>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, maxWidth: 700, marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, maxWidth: 900, marginBottom: 24 }}>
         {[
           { label: "WCC TITLES", value: h.titles?.wcc || 0, color: GOLD },
           { label: "WDC TITLES", value: h.titles?.wdc || 0, color: GOLD },
@@ -1012,6 +1069,13 @@ function HistoryTab({ history, rivalry }) {
             <div style={{ fontSize: 28, fontWeight: 900, color: s.color, fontFamily: "'Arial Black', sans-serif" }}>{s.value}</div>
           </div>
         ))}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(130px, 1fr))", gap: 8, maxWidth: 900, marginBottom: 24 }}>
+        <DashCard title="BEST WCC FINISH" accent="#E2B53A">{h.seasons?.length ? `P${Math.min(...h.seasons.map(s => s.wccPos || 99))}` : "—"}</DashCard>
+        <DashCard title="AVERAGE SEASON PTS" accent="#60A5FA">{h.seasons?.length ? Math.round(h.seasons.reduce((acc, s) => acc + (s.wccPts || 0), 0) / h.seasons.length) : 0}</DashCard>
+        <DashCard title="SAVE MILESTONE" accent="#4ADE80">{h.totalRaces >= 100 ? "100+ races completed" : `${h.totalRaces || 0} races logged`}</DashCard>
+        <DashCard title="HIGHLIGHT" accent="#C084FC">{h.seasons?.length ? `${h.seasons[h.seasons.length - 1].year} campaign complete` : "Run first season to unlock"}</DashCard>
       </div>
 
       {rivalry && rivalry.rivalName && (
