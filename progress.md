@@ -66,6 +66,11 @@ You run an F1 team across multiple seasons: hire drivers, manage contracts/budge
 - Update this file at the end of each dev session.
 
 ## Change Log
+### v0.1.5
+- Introduced centralized `ensureValidTeamRosters` hard validation and emergency fallback to guarantee exactly 2 drivers per team.
+- Added roster enforcement checkpoints across qualifying/race flow, offseason transitions, and full dev-season simulations.
+- Expanded dev diagnostics with roster invalid/emergency counters to verify long-run roster integrity.
+
 ### v0.1.4
 - Added stronger top-team downside risk in car evolution (larger elite stall/miss exposure and heavier diminishing returns).
 - Increased bounded race variability/attrition and underdog opportunity to reduce zero-point seasons and improve lower-half points access.
