@@ -66,6 +66,16 @@ You run an F1 team across multiple seasons: hire drivers, manage contracts/budge
 - Update this file at the end of each dev session.
 
 ## Change Log
+### v0.1.3
+- Replaced hard active-grid 80 OVR clamping with entry-based F1 seat floor behavior.
+- Added stronger seat-loss pressure for sub-80 active drivers, including multi-season low-rating penalties in AI retention.
+- Expanded grid-quality debug metrics (active <80, tier buckets, average grid OVR) for long-save balancing.
+
+### v0.1.2
+- Raised active-grid driver quality floor so race starters remain F1-level while preserving tier separation.
+- Tuned offseason/star progression pressure to reduce sticky long-term dominance at very high ratings.
+- Increased quality of elite young prospect generation and added clearer dev summary metrics for active-grid quality checks.
+
 ### v0.1.1
 - Added long-save balancing updates for elite-driver plateau/decline and top-end rating compression.
 - Improved generated-driver uniqueness and stronger top-tier prospect emergence.

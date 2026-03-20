@@ -82,7 +82,7 @@ function ensureProfileData(state) {
 
 function ratedProspectToDriver(pr, teamId, newSeason) {
   const years = pr.ovr >= 80 ? 2 : 1;
-  return { ...pr, teamId, contractEnd: newSeason + years };
+  return { ...pr, ovr: Math.max(80, pr.ovr), teamId, contractEnd: newSeason + years };
 }
 
 function enforceTeamRosterValidity(drivers, prospects, newSeason, transitionNews) {
@@ -141,7 +141,7 @@ function enforceTeamRosterValidity(drivers, prospects, newSeason, transitionNews
       if (fa) {
         const idx = fixedDrivers.findIndex(d => d.id === fa.id);
         if (idx >= 0) {
-          fixedDrivers[idx] = { ...fixedDrivers[idx], teamId: t.id, contractEnd: newSeason + (fa.ovr >= 84 ? 2 : 1) };
+          fixedDrivers[idx] = { ...fixedDrivers[idx], ovr: Math.max(80, fixedDrivers[idx].ovr), teamId: t.id, contractEnd: newSeason + (fa.ovr >= 84 ? 2 : 1) };
           transitionNews.push(makeNews(
             `${t.name} Finalize ${fa.name}`,
             `${t.name} fill an open seat via free agency to satisfy the 2-driver roster requirement.`,
@@ -161,7 +161,7 @@ function enforceTeamRosterValidity(drivers, prospects, newSeason, transitionNews
           ));
         } else {
           const emergency = makeEmergencyDriver();
-          fixedDrivers.push({ ...emergency, teamId: t.id, contractEnd: newSeason + 1 });
+          fixedDrivers.push({ ...emergency, ovr: Math.max(80, emergency.ovr), teamId: t.id, contractEnd: newSeason + 1 });
           transitionNews.push(makeNews(
             `${t.name} Sign Emergency Reserve`,
             `${t.name} sign ${emergency.name} as an emergency replacement to keep the grid full.`,
@@ -411,6 +411,8 @@ export default function F1Manager() {
       else if (perfPts >= 60) ovrChange += 1;
       else if (perfPts <= 3 && newAge >= 30) ovrChange -= 2;
       else if (perfPts <= 10 && newAge >= 30) ovrChange -= 1;
+      if (newAge >= 23 && newAge <= 31 && pot >= 84 && maybe(0.2)) ovrChange += 1;
+      if (d.ovr >= 80 && d.ovr <= 82 && perfPts >= 45 && maybe(0.25)) ovrChange += 1;
       if (newAge <= 24 && pot >= 90 && maybe(0.22)) ovrChange += pick([2, 3]);
       if (newAge >= 31 && maybe(0.2)) ovrChange -= pick([1, 2]);
       if (newAge >= 34 && maybe(0.3)) ovrChange -= pick([1, 2]);
@@ -420,7 +422,8 @@ export default function F1Manager() {
       const maxAllowed = (newAge <= 24 ? 96 : newAge <= 28 ? 95 : newAge <= 31 ? 94 : newAge <= 34 ? 92 : 90) + (legacyLongevity ? 1 : 0);
       const newOvr = Math.max(55, Math.min(maxAllowed, d.ovr + ovrChange));
       const newPot = Math.max(newOvr + 1, Math.min(99, pot + (newAge <= 22 && maybe(0.3) ? 1 : 0) - (newAge >= 31 ? 1 : 0)));
-      return { ...d, age: newAge, ovr: newOvr, pot: newPot, _ovrDelta: ovrChange };
+      const lowOvrSeasons = d.teamId !== null ? (newOvr < 80 ? (d.lowOvrSeasons || 0) + 1 : 0) : 0;
+      return { ...d, age: newAge, ovr: newOvr, pot: newPot, _ovrDelta: ovrChange, lowOvrSeasons };
     });
 
     const retiredDrivers = [];
@@ -462,11 +465,12 @@ export default function F1Manager() {
       const baseAge = isF3 ? 18 : isReserve ? pick([24, 25, 26, 31]) : 19;
       const series = isF3 ? "F3" : isReserve ? pick(["Reserve", "Veteran", "Free Agent"]) : "F2";
       const baseOvr = isEliteProspect
-        ? pick([70, 71, 72, 73, 74, 75, 76, 77])
+        ? pick([72, 73, 74, 75, 76, 77, 78, 79, 80, 81])
         : isF3 ? 60 + Math.floor(Math.random() * 7) : isReserve ? 70 + Math.floor(Math.random() * 8) : 63 + Math.floor(Math.random() * 9);
       const potBase = isEliteProspect ? pick([92, 93, 94, 95, 96]) : (isReserve ? 6 : 12) + Math.floor(Math.random() * 8);
       const pot = isEliteProspect ? Math.min(98, potBase + Math.floor(Math.random() * 2)) : Math.min(96, baseOvr + potBase);
-      return { name: generateUniqueName(usedGeneratedNames, firstNames, lastNames), age: baseAge, ovr: baseOvr, pace: pick([3, 4, 4, 5]), consistency: pick([2, 3, 4, 4]), wet: pick([2, 3, 4]), series, salary: Math.max(1, Math.round(baseOvr / 28)), pot, id: 200 + newSeason * 10 + i + Math.floor(Math.random() * 500), teamId: null, contractEnd: null };
+      const readyNudge = isEliteProspect && maybe(0.4) ? 1 : 0;
+      return { name: generateUniqueName(usedGeneratedNames, firstNames, lastNames), age: baseAge, ovr: baseOvr + readyNudge, pace: pick([3, 4, 4, 5]), consistency: pick([2, 3, 4, 4]), wet: pick([2, 3, 4]), series, salary: Math.max(1, Math.round(baseOvr / 28)), pot, id: 200 + newSeason * 10 + i + Math.floor(Math.random() * 500), teamId: null, contractEnd: null };
     });
     const allProspects = [...refreshedProspects, ...freshProspects];
 
@@ -629,6 +633,20 @@ export default function F1Manager() {
       const over90 = next.drivers.filter(d => d.ovr >= 90).length;
       const over92 = next.drivers.filter(d => d.ovr >= 92).length;
       const over95 = next.drivers.filter(d => d.ovr >= 95).length;
+      const activeDrivers = next.drivers.filter(d => d.teamId !== null);
+      const activeOver80 = activeDrivers.filter(d => d.ovr >= 80).length;
+      const activeOver85 = activeDrivers.filter(d => d.ovr >= 85).length;
+      const activeBelow80 = activeDrivers.filter(d => d.ovr < 80).length;
+      const bucket8082 = activeDrivers.filter(d => d.ovr >= 80 && d.ovr <= 82).length;
+      const bucket8385 = activeDrivers.filter(d => d.ovr >= 83 && d.ovr <= 85).length;
+      const bucket86plus = activeDrivers.filter(d => d.ovr >= 86).length;
+      const avgGridOvr = activeDrivers.length ? (activeDrivers.reduce((sum, d) => sum + d.ovr, 0) / activeDrivers.length).toFixed(1) : "—";
+      const lowestStarter = [...activeDrivers].sort((a, b) => a.ovr - b.ovr)[0];
+      const topYoungProspects = [...next.prospects]
+        .filter(d => d.age <= 21)
+        .sort((a, b) => (b.pot || b.ovr) - (a.pot || a.ovr))
+        .slice(0, 5)
+        .map(d => `${d.name.split(" ").pop()} ${d.ovr}/${d.pot}`);
       const sortedCars = Object.entries(next.teamCars || {}).map(([id, rating]) => ({ team: TEAMS.find(t => t.id === id), rating })).sort((a, b) => b.rating - a.rating);
       const zeroPointTeams = buildConstructorStandings(sim.constructorPoints).filter(s => s.pts === 0).map(s => s.team?.name).filter(Boolean);
       const constructorOrder = buildConstructorStandings(sim.constructorPoints).map((s, idx) => `P${idx + 1} ${s.team?.name} (${s.pts})`).join(" · ");
@@ -651,7 +669,7 @@ export default function F1Manager() {
         .map(row => `${row.team?.name} (car P${row.carRank}, drivers P${row.driverRank})`);
       const summary = makeNews(
         "Dev Sim Summary",
-        `WDC: ${topD?.driver?.name || "—"}. WCC: ${topC?.team?.name || "—"}. Duplicates: ${duplicateNames.length ? duplicateNames.join(", ") : "none"}. Top10 OVR: ${top10Ratings.map(d => `${d.name.split(" ").pop()} ${d.ovr}`).join(", ")}. OVR90+/92+/95+: ${over90}/${over92}/${over95}. OVR80+: ${over80.length}. Top-car team avg OVR: ${topTeamDriverAvg}. Car-driver mismatch: ${mismatchTeams.length ? mismatchTeams.join(", ") : "none"}. Car range: ${sortedCars[sortedCars.length - 1]?.rating ?? "—"}-${sortedCars[0]?.rating ?? "—"}. Zero-point teams: ${zeroPointTeams.length ? zeroPointTeams.join(", ") : "none"}. Constructors: ${constructorOrder}.`,
+        `WDC: ${topD?.driver?.name || "—"}. WCC: ${topC?.team?.name || "—"}. Duplicates: ${duplicateNames.length ? duplicateNames.join(", ") : "none"}. Active <80: ${activeBelow80}. Active OVR80+/85+: ${activeOver80}/${activeOver85}. Active buckets 80-82/83-85/86+: ${bucket8082}/${bucket8385}/${bucket86plus}. Avg grid OVR: ${avgGridOvr}. Lowest starter: ${lowestStarter ? `${lowestStarter.name} ${lowestStarter.ovr}` : "—"}. Top U22 prospects: ${topYoungProspects.length ? topYoungProspects.join(", ") : "none"}. Top10 OVR: ${top10Ratings.map(d => `${d.name.split(" ").pop()} ${d.ovr}`).join(", ")}. OVR90+/92+/95+: ${over90}/${over92}/${over95}. OVR80+: ${over80.length}. Top-car team avg OVR: ${topTeamDriverAvg}. Car-driver mismatch: ${mismatchTeams.length ? mismatchTeams.join(", ") : "none"}. Car range: ${sortedCars[sortedCars.length - 1]?.rating ?? "—"}-${sortedCars[0]?.rating ?? "—"}. Zero-point teams: ${zeroPointTeams.length ? zeroPointTeams.join(", ") : "none"}. Constructors: ${constructorOrder}.`,
         "Team",
         0
       );
@@ -663,7 +681,7 @@ export default function F1Manager() {
     if (myDrivers.length >= 2 || budget < pr.salary) return;
     const sn = genSigningNews(team, pr, raceIndex + 1);
     setGame(p => {
-      const newDrivers = [...p.drivers, { ...pr, teamId: team.id, contractEnd: season + 2 }];
+      const newDrivers = [...p.drivers, { ...pr, ovr: Math.max(80, pr.ovr), teamId: team.id, contractEnd: season + 2 }];
       const effects = applyNewsEffects(sn, { ...p, budget: p.budget - pr.salary });
       return { ...p, drivers: newDrivers, prospects: p.prospects.filter(x => x.id !== pr.id), budget: effects.budget - pr.salary, modifiers: effects.modifiers, news: [...sn, ...p.news] };
     });
