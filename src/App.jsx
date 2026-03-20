@@ -31,12 +31,12 @@ function potBar(pot) { const pct = ((pot - 60) / 40) * 100; const col = pot >= 8
 function Sec({ children }) { return <div style={{ fontSize: 10, letterSpacing: 3, color: "#fff", fontWeight: 700, marginBottom: 14, paddingBottom: 6, borderBottom: `1px solid ${BLUE}33` }}>{children}</div>; }
 function TS({ label, value, sub, color }) { return (<div><div style={{ fontSize: 9, color: DIM, letterSpacing: 2, marginBottom: 1 }}>{label}</div><div style={{ display: "flex", alignItems: "baseline", gap: 4 }}><span style={{ fontSize: 20, fontWeight: 900, color: color || "#fff", fontFamily: "'Arial Black', sans-serif" }}>{value}</span>{sub && <span style={{ fontSize: 9, color: DIM }}>{sub}</span>}</div></div>); }
 function DashCard({ title, children, accent }) {
-  return <div style={{ background: BG3, border: `1px solid ${accent ? accent + "55" : BORDER}`, padding: "12px 14px", minHeight: 88 }}><div style={{ fontSize: 8, color: accent || DIM, letterSpacing: 2, marginBottom: 6, fontWeight: 700 }}>{title}</div><div style={{ fontSize: 11, color: TEXT2, lineHeight: 1.5 }}>{children}</div></div>;
+  return <div style={{ background: `linear-gradient(155deg, ${BG3} 5%, rgba(20,27,40,0.95) 55%, rgba(29,38,56,0.95) 100%)`, border: `1px solid ${accent ? accent + "88" : BORDER}`, boxShadow: accent ? `0 0 0 1px ${accent}22 inset, 0 10px 24px rgba(0,0,0,0.28)` : "0 8px 18px rgba(0,0,0,0.22)", padding: "12px 14px", minHeight: 88 }}><div style={{ fontSize: 8, color: accent || DIM, letterSpacing: 2, marginBottom: 6, fontWeight: 700 }}>{title}</div><div style={{ fontSize: 11, color: TEXT2, lineHeight: 1.5 }}>{children}</div></div>;
 }
 function DriverLink({ driver, onOpen, color = TEXT, weight = 700 }) {
   if (!driver) return <span style={{ color }}>—</span>;
   return (
-    <button onClick={() => onOpen?.(driver.id)} style={{ background: "transparent", border: "none", color, fontWeight: weight, cursor: "pointer", padding: 0, fontFamily: "inherit", textDecoration: "underline dotted", textUnderlineOffset: 2 }}>
+    <button onClick={() => onOpen?.(driver.id)} style={{ background: "transparent", border: "none", color, fontWeight: weight, cursor: "pointer", padding: 0, fontFamily: "inherit", textDecoration: "underline dotted", textUnderlineOffset: 2, transition: "all 0.16s ease", textShadow: "0 0 8px rgba(91,141,239,0.15)" }}>
       {driver.name}
     </button>
   );
@@ -322,9 +322,11 @@ function updateProfileStats(prev, raceResult, driverPoints, constructorPoints, s
   }
 
   if (isLastRace) {
-    const driverPositions = Object.entries(driverPoints)
-      .sort((a, b) => (b[1] || 0) - (a[1] || 0))
-      .reduce((acc, [id], idx) => ({ ...acc, [id]: idx + 1 }), {});
+    const driverPositions = prev.drivers
+      .filter(d => d.teamId !== null)
+      .map(d => ({ id: d.id, pts: driverPoints[d.id] || 0, ovr: d.ovr || 0, pace: d.pace || 0, consistency: d.consistency || 0 }))
+      .sort((a, b) => (b.pts - a.pts) || (b.ovr - a.ovr) || ((b.pace + b.consistency) - (a.pace + a.consistency)))
+      .reduce((acc, row, idx) => ({ ...acc, [row.id]: idx + 1 }), {});
     Object.entries(driverSeason).forEach(([id, stat]) => {
       const prevCareer = driverCareer[id] || { total: blankSeasonStats(), seasons: [] };
       const total = { ...prevCareer.total };
@@ -890,8 +892,8 @@ export default function F1Manager() {
   ];
 
   return (
-    <div style={{ height: "100dvh", minHeight: "100vh", width: "100vw", overflow: "hidden", background: BG, color: TEXT, fontFamily: "'Courier New', monospace", display: "flex", fontSize: 13 }}>
-      <div style={{ width: 190, height: "100%", background: BG2, borderRight: `1px solid ${BORDER}`, display: "flex", flexDirection: "column", flexShrink: 0 }}>
+    <div style={{ height: "100dvh", minHeight: "100vh", width: "100vw", overflow: "hidden", background: `radial-gradient(1200px 700px at 80% -20%, rgba(91,141,239,0.16), transparent 60%), radial-gradient(900px 500px at -10% 120%, rgba(192,132,252,0.12), transparent 62%), ${BG}`, color: TEXT, fontFamily: "'Courier New', monospace", display: "flex", fontSize: 13 }}>
+      <div style={{ width: 190, height: "100%", background: `linear-gradient(180deg, ${BG2}, #0F1727 48%, #101A2A)`, borderRight: `1px solid ${BORDER}`, boxShadow: "inset -1px 0 0 rgba(91,141,239,0.2)", display: "flex", flexDirection: "column", flexShrink: 0 }}>
         <div style={{ padding: "18px 14px 20px", borderBottom: `1px solid ${BORDER}` }}>
           <div style={{ fontSize: 11, letterSpacing: 4, color: BLUE, fontWeight: 700, marginBottom: 2 }}>PIT WALL</div>
           <div style={{ fontSize: 10, color: DIM2 }}>{season} · R{Math.min(raceIndex + 1, RACES_2026.length)}/{RACES_2026.length}</div>
@@ -900,7 +902,7 @@ export default function F1Manager() {
           {sidebarTabs.map(t => (
             <button key={t.id} onClick={() => { setGame(p => ({ ...p, tab: t.id, unreadNews: t.id === "news" ? 0 : p.unreadNews })); }} style={{
               display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 14px",
-              border: "none", background: tab === t.id ? "rgba(255,255,255,0.05)" : "transparent",
+              border: "none", background: tab === t.id ? "linear-gradient(90deg, rgba(91,141,239,0.22), rgba(91,141,239,0.06))" : "transparent",
               color: tab === t.id ? "#fff" : DIM,
               borderLeft: tab === t.id ? `2px solid ${team.color}` : "2px solid transparent",
               cursor: "pointer", fontSize: 10, fontFamily: "inherit", letterSpacing: 2,
@@ -930,7 +932,7 @@ export default function F1Manager() {
       </div>
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", borderBottom: `1px solid ${BORDER}`, background: BG2, flexWrap: "wrap", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", borderBottom: `1px solid ${BORDER}`, background: "linear-gradient(100deg, rgba(17,21,29,0.95), rgba(28,37,55,0.95))", boxShadow: "0 8px 20px rgba(0,0,0,0.22)", flexWrap: "wrap", gap: 12 }}>
           <div style={{ display: "flex", gap: 28, alignItems: "center" }}>
             <TS label="WCC" value={myCP} sub={cRank ? `P${cRank}` : "—"} color={team.color} />
             <TS label={myD1?.name?.split(" ").pop() || "—"} value={myD1 ? (driverPoints[myD1.id] || 0) : "—"} sub={d1Rank ? `P${d1Rank}` : ""} />
@@ -973,7 +975,7 @@ function NewsTab({ news }) {
         {news.map(n => {
           const cc = CAT_COLORS[n.category] || CAT_COLORS.Team;
           return (
-            <div key={n.id} style={{ padding: "14px 16px", marginBottom: 8, background: BG3, border: `1px solid ${BORDER}`, borderLeft: `3px solid ${cc.fg}` }}>
+            <div key={n.id} style={{ padding: "14px 16px", marginBottom: 8, background: `linear-gradient(145deg, ${BG3}, rgba(23,29,42,0.95))`, border: `1px solid ${BORDER}`, boxShadow: "0 10px 18px rgba(0,0,0,0.18)", borderLeft: `3px solid ${cc.fg}` }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                 <span style={{ fontSize: 8, padding: "2px 7px", background: cc.bg, color: cc.fg, fontWeight: 700, letterSpacing: 1, borderRadius: 2 }}>{n.category.toUpperCase()}</span>
                 <span style={{ fontSize: 9, color: DIM2 }}>Round {n.round}</span>
