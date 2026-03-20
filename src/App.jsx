@@ -37,7 +37,7 @@ function DashCard({ title, children, accent }) {
 function DriverLink({ driver, onOpen, color = TEXT, weight = 700 }) {
   if (!driver) return <span style={{ color }}>—</span>;
   return (
-    <button onClick={() => onOpen?.(driver.id)} style={{ background: "transparent", border: "none", color, fontWeight: weight, cursor: "pointer", padding: 0, fontFamily: "inherit", textDecoration: "underline dotted", textUnderlineOffset: 2, transition: "all 0.16s ease", textShadow: "0 0 8px rgba(91,141,239,0.15)" }}>
+    <button onClick={() => onOpen?.(driver.id)} style={{ background: "transparent", border: "none", color, fontWeight: weight, cursor: "pointer", padding: "0 2px", borderRadius: 4, fontFamily: "inherit", textDecoration: "none", transition: "all 0.16s ease", textShadow: "0 0 8px rgba(91,141,239,0.2)" }}>
       {driver.name}
     </button>
   );
@@ -1099,20 +1099,28 @@ function RaceTab({ currentRace, weekendPhase, qualiResults, qualiWeather, raceRe
       {weekendPhase === "quali_reveal" && qualiResults && (
         <div style={{ marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}><Sec>QUALIFYING</Sec><span style={{ fontSize: 20, marginTop: -14 }}>{qualiWeather?.icon}</span><span style={{ fontSize: 9, color: qualiWeather?.id === "wet" || qualiWeather?.id === "storm" ? "#60A5FA" : TEXT2, letterSpacing: 2, marginTop: -14 }}>{qualiWeather?.label}</span></div>
-          <table style={{ width: "100%", maxWidth: 900, borderCollapse: "collapse" }}>
-            <thead><tr style={{ borderBottom: `1px solid ${BORDER2}` }}>{["POS", "DRIVER", "TEAM", "TIME", "GAP"].map(h => (<th key={h} style={{ textAlign: "left", padding: "6px 8px", fontSize: 8, color: DIM, letterSpacing: 2, fontWeight: 600 }}>{h}</th>))}</tr></thead>
-            <tbody>{qualiResults.map((d, i) => {
-              const vis = i < revealCount; const dt = TEAMS.find(t => t.id === d.teamId); const mine = d.teamId === team.id;
-              const gap = i === 0 ? "" : d.crashed ? "" : `+${(d.lapTime - qualiResults[0]?.lapTime).toFixed(3)}`;
-              return (<tr key={d.id} style={{ borderBottom: `1px solid ${BORDER}`, background: mine ? `${team.color}25` : "transparent", opacity: vis ? 1 : 0, transform: vis ? "translateX(0)" : "translateX(-20px)", transition: "all 0.3s ease-out" }}>
-                <td style={{ padding: "8px", fontWeight: 700, color: i === 0 ? "#fff" : i < 3 ? TEXT : DIM, width: 36 }}>{i + 1}</td>
-                <td style={{ padding: "8px", fontWeight: mine ? 800 : 400, color: mine ? "#fff" : TEXT }}><DriverLink driver={d} onOpen={openDriverCard} color={mine ? "#fff" : TEXT} weight={mine ? 800 : 500} /></td>
-                <td style={{ padding: "8px" }}><span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><TeamBadge teamId={d.teamId} size={14} /><span style={{ color: DIM, fontSize: 11 }}>{dt?.name}</span></span></td>
-                <td style={{ padding: "8px", fontFamily: "'Courier New', monospace", color: d.crashed ? "#EF4444" : i === 0 ? BLUE : TEXT2 }}>{d.crashed ? "NO TIME" : formatTime(d.lapTime)}</td>
-                <td style={{ padding: "8px", color: DIM, fontSize: 11 }}>{gap}</td>
-              </tr>);
-            })}</tbody>
-          </table>
+          {(() => {
+            const renderQualiTable = (rows, offset) => (
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead><tr style={{ borderBottom: `1px solid ${BORDER2}` }}>{["POS", "DRIVER", "TEAM", "TIME", "GAP"].map(h => (<th key={h} style={{ textAlign: "left", padding: "6px 8px", fontSize: 8, color: DIM, letterSpacing: 2, fontWeight: 600 }}>{h}</th>))}</tr></thead>
+                <tbody>{rows.map((d, idx) => {
+                  const i = offset + idx;
+                  const vis = i < revealCount; const dt = TEAMS.find(t => t.id === d.teamId); const mine = d.teamId === team.id;
+                  const gap = i === 0 ? "" : d.crashed ? "" : `+${(d.lapTime - qualiResults[0]?.lapTime).toFixed(3)}`;
+                  return (<tr key={d.id} style={{ borderBottom: `1px solid ${BORDER}`, background: mine ? `${team.color}25` : "transparent", opacity: vis ? 1 : 0, transform: vis ? "translateX(0)" : "translateX(-20px)", transition: "all 0.3s ease-out" }}>
+                    <td style={{ padding: "8px", fontWeight: 700, color: i === 0 ? "#fff" : i < 3 ? TEXT : DIM, width: 36 }}>{i + 1}</td>
+                    <td style={{ padding: "8px", fontWeight: mine ? 800 : 400, color: mine ? "#fff" : TEXT }}><DriverLink driver={d} onOpen={openDriverCard} color={mine ? "#fff" : TEXT} weight={mine ? 800 : 500} /></td>
+                    <td style={{ padding: "8px" }}><span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><TeamBadge teamId={d.teamId} size={14} /><span style={{ color: DIM, fontSize: 11 }}>{dt?.name}</span></span></td>
+                    <td style={{ padding: "8px", fontFamily: "'Courier New', monospace", color: d.crashed ? "#EF4444" : i === 0 ? BLUE : TEXT2 }}>{d.crashed ? "NO TIME" : formatTime(d.lapTime)}</td>
+                    <td style={{ padding: "8px", color: DIM, fontSize: 11 }}>{gap}</td>
+                  </tr>);
+                })}</tbody>
+              </table>
+            );
+            const left = qualiResults.slice(0, 10);
+            const right = qualiResults.slice(10);
+            return <div style={{ display: "grid", gridTemplateColumns: right.length > 0 ? "1fr 1fr" : "1fr", gap: 12 }}>{renderQualiTable(left, 0)}{right.length > 0 && renderQualiTable(right, 10)}</div>;
+          })()}
           {revealCount >= qualiResults.length && (<div style={{ textAlign: "center", marginTop: 20 }}>
             <div style={{ fontSize: 10, color: BLUE, letterSpacing: 2, marginBottom: 4 }}>POLE: {qualiResults[0]?.name} — {qualiResults[0]?.lapTime ? formatTime(qualiResults[0].lapTime) : "—"}</div>
             <button onClick={startRace} className="btn-primary" style={{ marginTop: 12, padding: "14px 48px", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 800, letterSpacing: 3, fontFamily: "inherit" }}>LIGHTS OUT →</button>
@@ -1138,31 +1146,39 @@ function RaceTab({ currentRace, weekendPhase, qualiResults, qualiWeather, raceRe
             }, null) : null;
             return (<>
               {fastestLap && <div style={{ marginBottom: 8, fontSize: 10, letterSpacing: 2, color: "#C084FC", fontWeight: 700 }}>⚡ FASTEST LAP: <DriverLink driver={fastestLap} onOpen={openDriverCard} color="#C084FC" /></div>}
-              <table style={{ width: "100%", maxWidth: 900, borderCollapse: "collapse" }}>
-                <thead><tr style={{ borderBottom: `1px solid ${BORDER2}` }}>{["POS", "DRIVER", "TEAM", "GRID", "+/-", "PTS", "FL"].map(h => (<th key={h} style={{ textAlign: "left", padding: "6px 8px", fontSize: 8, color: DIM, letterSpacing: 2, fontWeight: 600 }}>{h}</th>))}</tr></thead>
-                <tbody>{raceResult.results.map((d, i) => {
-                  const rc = weekendPhase === "race_done" ? raceResult.results.length : raceRevealCount;
-                  const vis = i < rc; const dt = TEAMS.find(t => t.id === d.teamId); const mine = d.teamId === team.id;
-                  const pc = d.dnf ? null : d.gridPos - (i + 1);
-                  const podiumBg = i === 0 ? "rgba(255,215,0,0.18)" : i === 1 ? "rgba(255,214,102,0.14)" : i === 2 ? "rgba(234,179,8,0.14)" : "transparent";
-                  const podiumBorder = i === 0 ? "#FFD700" : i === 1 ? "#FACC15" : i === 2 ? "#EAB308" : null;
-                  const isFastest = fastestLap && d.id === fastestLap.id && !d.dnf;
-                  return (<tr key={d.id} style={{ borderBottom: `1px solid ${BORDER}`, background: mine ? `${team.color}25` : podiumBg, boxShadow: podiumBorder ? `inset 3px 0 0 ${podiumBorder}` : "none", opacity: vis ? 1 : 0, transform: vis ? "translateX(0)" : "translateX(-20px)", transition: "all 0.3s ease-out" }}>
-                    <td style={{ padding: "8px", fontWeight: 800, color: d.dnf ? "#EF4444" : i < 3 ? "#fff" : DIM, width: 44 }}>{d.dnf ? "DNF" : i + 1}</td>
-                    <td style={{ padding: "8px", fontWeight: mine ? 800 : 500, color: d.dnf ? "#FCA5A5" : mine ? "#fff" : TEXT, textDecoration: d.dnf ? "line-through" : "none" }}>
-                      {i < 3 && !d.dnf ? <span style={{ marginRight: 5 }}>{i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉"}</span> : null}
-                      <DriverLink driver={d} onOpen={openDriverCard} color={d.dnf ? "#FCA5A5" : mine ? "#fff" : TEXT} weight={mine ? 800 : 500} />
-                    </td>
-                    <td style={{ padding: "8px" }}><span style={{ display: "inline-flex", alignItems: "center", gap: 5, opacity: d.dnf ? 0.75 : 1 }}><TeamBadge teamId={d.teamId} size={14} /><span style={{ color: DIM, fontSize: 11 }}>{dt?.name}</span></span></td>
-                    <td style={{ padding: "8px", color: DIM, fontSize: 11 }}>P{d.gridPos}</td>
-                    <td style={{ padding: "8px", fontSize: 10, fontWeight: 800 }}>
-                      {d.dnf ? <span style={{ color: DIM3 }}>—</span> : pc > 0 ? <span style={{ color: "#4ADE80", background: "rgba(34,197,94,0.15)", border: "1px solid rgba(34,197,94,0.35)", padding: "1px 6px" }}>▲ {pc}</span> : pc < 0 ? <span style={{ color: "#F87171", background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.35)", padding: "1px 6px" }}>▼ {Math.abs(pc)}</span> : <span style={{ color: DIM }}>—</span>}
-                    </td>
-                    <td style={{ padding: "8px", color: !d.dnf && i < 10 ? "#E2B53A" : DIM3, fontWeight: 700 }}>{d.dnf ? "—" : (POINTS[i] || 0)}</td>
-                    <td style={{ padding: "8px", color: isFastest ? "#C084FC" : DIM3, fontWeight: 800 }}>{isFastest ? "⚡" : "—"}</td>
-                  </tr>);
-                })}</tbody>
-              </table>
+              {(() => {
+                const renderRaceTable = (rows, offset) => (
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <thead><tr style={{ borderBottom: `1px solid ${BORDER2}` }}>{["POS", "DRIVER", "TEAM", "GRID", "+/-", "PTS", "FL"].map(h => (<th key={h} style={{ textAlign: "left", padding: "6px 8px", fontSize: 8, color: DIM, letterSpacing: 2, fontWeight: 600 }}>{h}</th>))}</tr></thead>
+                    <tbody>{rows.map((d, idx) => {
+                      const i = offset + idx;
+                      const rc = weekendPhase === "race_done" ? raceResult.results.length : raceRevealCount;
+                      const vis = i < rc; const dt = TEAMS.find(t => t.id === d.teamId); const mine = d.teamId === team.id;
+                      const pc = d.dnf ? null : d.gridPos - (i + 1);
+                      const podiumBg = i === 0 ? "rgba(255,215,0,0.18)" : i === 1 ? "rgba(255,214,102,0.14)" : i === 2 ? "rgba(234,179,8,0.14)" : "transparent";
+                      const podiumBorder = i === 0 ? "#FFD700" : i === 1 ? "#FACC15" : i === 2 ? "#EAB308" : null;
+                      const isFastest = fastestLap && d.id === fastestLap.id && !d.dnf;
+                      return (<tr key={d.id} style={{ borderBottom: `1px solid ${BORDER}`, background: mine ? `${team.color}25` : podiumBg, boxShadow: podiumBorder ? `inset 3px 0 0 ${podiumBorder}` : "none", opacity: vis ? 1 : 0, transform: vis ? "translateX(0)" : "translateX(-20px)", transition: "all 0.3s ease-out" }}>
+                        <td style={{ padding: "8px", fontWeight: 800, color: d.dnf ? "#EF4444" : i < 3 ? "#fff" : DIM, width: 44 }}>{d.dnf ? "DNF" : i + 1}</td>
+                        <td style={{ padding: "8px", fontWeight: mine ? 800 : 500, color: d.dnf ? "#FCA5A5" : mine ? "#fff" : TEXT, textDecoration: d.dnf ? "line-through" : "none" }}>
+                          {i < 3 && !d.dnf ? <span style={{ marginRight: 5 }}>{i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉"}</span> : null}
+                          <DriverLink driver={d} onOpen={openDriverCard} color={d.dnf ? "#FCA5A5" : mine ? "#fff" : TEXT} weight={mine ? 800 : 500} />
+                        </td>
+                        <td style={{ padding: "8px" }}><span style={{ display: "inline-flex", alignItems: "center", gap: 5, opacity: d.dnf ? 0.75 : 1 }}><TeamBadge teamId={d.teamId} size={14} /><span style={{ color: DIM, fontSize: 11 }}>{dt?.name}</span></span></td>
+                        <td style={{ padding: "8px", color: DIM, fontSize: 11 }}>P{d.gridPos}</td>
+                        <td style={{ padding: "8px", fontSize: 10, fontWeight: 800 }}>
+                          {d.dnf ? <span style={{ color: DIM3 }}>—</span> : pc > 0 ? <span style={{ color: "#4ADE80", background: "rgba(34,197,94,0.15)", border: "1px solid rgba(34,197,94,0.35)", padding: "1px 6px" }}>▲ {pc}</span> : pc < 0 ? <span style={{ color: "#F87171", background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.35)", padding: "1px 6px" }}>▼ {Math.abs(pc)}</span> : <span style={{ color: DIM }}>—</span>}
+                        </td>
+                        <td style={{ padding: "8px", color: !d.dnf && i < 10 ? "#E2B53A" : DIM3, fontWeight: 700 }}>{d.dnf ? "—" : (POINTS[i] || 0)}</td>
+                        <td style={{ padding: "8px", color: isFastest ? "#C084FC" : DIM3, fontWeight: 800 }}>{isFastest ? "⚡" : "—"}</td>
+                      </tr>);
+                    })}</tbody>
+                  </table>
+                );
+                const left = raceResult.results.slice(0, 10);
+                const right = raceResult.results.slice(10);
+                return <div style={{ display: "grid", gridTemplateColumns: right.length > 0 ? "1fr 1fr" : "1fr", gap: 12 }}>{renderRaceTable(left, 0)}{right.length > 0 && renderRaceTable(right, 10)}</div>;
+              })()}
             </>);
           })()}
           {weekendPhase === "race_done" && (<div style={{ textAlign: "center", marginTop: 28 }}>
