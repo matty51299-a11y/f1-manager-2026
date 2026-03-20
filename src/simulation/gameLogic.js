@@ -638,25 +638,44 @@ function updateHistory(history, season, raceResult, driverPoints, constructorPoi
 
 function finaliseSeasonHistory(history, season, driverPoints, constructorPoints, team, drivers) {
   const h = { ...history };
+  if (!h.seasons) h.seasons = [];
+  if (!h.champions) h.champions = [];
   const cStandings = TEAMS.map(t => ({ teamId: t.id, pts: constructorPoints?.[t.id] || 0 })).sort((a, b) => b.pts - a.pts);
-  const dStandings = Object.entries(driverPoints).map(([id, pts]) => {
-    const d = drivers.find(x => x.id === parseInt(id));
-    return d ? { driver: d, pts } : null;
-  }).filter(Boolean).sort((a, b) => b.pts - a.pts);
+  const dStandings = drivers
+    .filter(d => d.teamId !== null)
+    .map(d => ({ driver: d, pts: driverPoints[d.id] || 0 }))
+    .sort((a, b) => (b.pts - a.pts) || ((b.driver?.ovr || 0) - (a.driver?.ovr || 0)) || (a.driver?.name || "").localeCompare(b.driver?.name || ""));
 
   const cPos = cStandings.findIndex(s => s.teamId === team.id) + 1;
   const cPts = constructorPoints[team.id] || 0;
   const myDriverResults = drivers.filter(d => d.teamId === team.id).map(d => {
-    const pos = dStandings.findIndex(s => s.driver?.id === d.id) + 1;
+    const rankIdx = dStandings.findIndex(s => s.driver?.id === d.id);
+    const pos = rankIdx >= 0 ? rankIdx + 1 : null;
     return { name: d.name, pos, pts: driverPoints[d.id] || 0 };
   });
-  const bestWDC = myDriverResults.length > 0 ? Math.min(...myDriverResults.map(d => d.pos)) : 99;
+  const bestWDC = myDriverResults.length > 0 ? Math.min(...myDriverResults.map(d => d.pos || 99)) : 99;
+  const wdcChampion = dStandings[0]?.driver;
+  const wccChampionTeam = TEAMS.find(t => t.id === cStandings[0]?.teamId);
 
   if (cPos === 1) h.titles.wcc++;
   if (bestWDC === 1) h.titles.wdc++;
   h.totalPoints += cPts;
 
-  h.seasons.push({ year: season, wccPos: cPos, wccPts: cPts, drivers: myDriverResults, wins: h.totalWins, podiums: h.totalPodiums });
+  h.seasons.push({
+    year: season,
+    wccPos: cPos,
+    wccPts: cPts,
+    drivers: myDriverResults,
+    wins: h.totalWins,
+    podiums: h.totalPodiums,
+    wdcWinner: wdcChampion ? { name: wdcChampion.name, teamId: wdcChampion.teamId, pts: dStandings[0]?.pts || 0 } : null,
+    wccWinner: wccChampionTeam ? { name: wccChampionTeam.name, teamId: wccChampionTeam.id, pts: cStandings[0]?.pts || 0 } : null,
+  });
+  h.champions.push({
+    year: season,
+    wdc: wdcChampion ? { name: wdcChampion.name, teamId: wdcChampion.teamId, pts: dStandings[0]?.pts || 0 } : null,
+    wcc: wccChampionTeam ? { name: wccChampionTeam.name, teamId: wccChampionTeam.id, pts: cStandings[0]?.pts || 0 } : null,
+  });
   return h;
 }
 

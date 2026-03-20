@@ -882,6 +882,7 @@ export default function F1Manager() {
   const d2Rank = myD2 ? driverStandings.findIndex(s => s.driver?.id === myD2.id) + 1 : 0;
 
   const sidebarTabs = [
+    { id: "home", label: "HOME", icon: "🏠" },
     { id: "race", label: "RACE WEEKEND", icon: "🏁" },
     { id: "news", label: "NEWS", icon: "📰", badge: unreadNews },
     { id: "squad", label: "SQUAD", icon: "👥" },
@@ -934,7 +935,7 @@ export default function F1Manager() {
         </div>
       </div>
 
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0 }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0, position: "relative" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 22px", borderBottom: `1px solid ${BORDER}`, background: "linear-gradient(90deg, #070b18, #13233f)", boxShadow: "0 10px 24px rgba(0,0,0,0.3), 0 0 14px rgba(79,140,255,0.2)", flexWrap: "wrap", gap: 14 }}>
           <div style={{ display: "flex", gap: 28, alignItems: "center" }}>
             <TS label="WCC" value={myCP} sub={cRank ? `P${cRank}` : "—"} color={team.color} />
@@ -948,7 +949,8 @@ export default function F1Manager() {
           </div>}
           {currentRace && <div style={{ fontSize: 10, color: DIM, letterSpacing: 1 }}>R{raceIndex + 1} · {currentRace.name}</div>}
         </div>
-        <div style={{ padding: 20, flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden" }}>
+        <div style={{ padding: "20px 20px 96px", flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden" }}>
+          {tab === "home" && <HomeTab {...{ team, myDrivers, driverPoints, constructorStandings, driverStandings, currentRace, season, raceIndex, news }} />}
           {tab === "race" && <RaceTab {...{ currentRace, weekendPhase, qualiResults, qualiWeather, raceResult, raceRevealCount, revealCount, startQuali, startRace, nextWeekend, startNextSeason, team, raceIndex, driverStandings, constructorStandings, season, myDrivers, rivalry, simSeasonDev, openDriverCard: setDriverCardId }} />}
           {tab === "news" && <NewsTab news={news} />}
           {tab === "squad" && <SquadTab {...{ myDrivers, team, driverPoints, releaseDriver, season, openDriverCard: setDriverCardId }} />}
@@ -959,6 +961,13 @@ export default function F1Manager() {
           {tab === "standings" && <StandingsTab {...{ driverStandings, constructorStandings, team, openDriverCard: setDriverCardId }} />}
           {tab === "calendar" && <CalendarTab {...{ raceIndex, raceResults, team, season }} />}
           {tab === "history" && <HistoryTab history={history} team={team} rivalry={rivalry} />}
+        </div>
+        <div style={{ position: "absolute", left: "50%", bottom: 14, transform: "translateX(-50%)", background: "linear-gradient(135deg, rgba(10,16,30,0.92), rgba(20,34,58,0.92))", border: `1px solid ${BORDER2}`, boxShadow: "0 18px 34px rgba(0,0,0,0.45), 0 0 22px rgba(79,140,255,0.2)", borderRadius: 16, padding: "8px 10px", display: "flex", gap: 8, zIndex: 8 }}>
+          {sidebarTabs.slice(0, 8).map(t => (
+            <button key={`bottom-${t.id}`} onClick={() => setGame(p => ({ ...p, tab: t.id, unreadNews: t.id === "news" ? 0 : p.unreadNews }))} style={{ border: "none", background: tab === t.id ? "linear-gradient(135deg, rgba(79,140,255,0.35), rgba(79,215,255,0.22))" : "transparent", color: tab === t.id ? "#fff" : DIM, borderRadius: 10, padding: "8px 12px", cursor: "pointer", fontFamily: "inherit", fontSize: 10, letterSpacing: 1.5, fontWeight: tab === t.id ? 800 : 600 }}>
+              {t.icon} {t.label}
+            </button>
+          ))}
         </div>
       </div>
       <DriverHistoryModal driver={cardDriver} season={season} driverPoints={driverPoints} driverSeasonStats={driverSeasonStats} driverCareer={driverCareer} onClose={() => setDriverCardId(null)} />
@@ -1001,6 +1010,47 @@ function NewsTab({ news }) {
 /* ═══════════════════════════════════════════
    RACE WEEKEND TAB
    ═══════════════════════════════════════════ */
+function HomeTab({ team, myDrivers, driverPoints, constructorStandings, driverStandings, currentRace, season, raceIndex, news }) {
+  const teamPos = constructorStandings.findIndex(s => s.team?.id === team.id) + 1;
+  const teamPts = constructorStandings.find(s => s.team?.id === team.id)?.pts || 0;
+  const compactConstructors = constructorStandings.slice(0, 5);
+  const compactDrivers = driverStandings.slice(0, 6);
+  const notableNews = (news || []).slice(0, 4);
+  return (
+    <div>
+      <Sec>HOME HUB</Sec>
+      <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 14, marginBottom: 14 }}>
+        <div className="hero card card-blue" style={{ height: 240, backgroundImage: "radial-gradient(circle at 20% 20%, rgba(79,140,255,0.34), transparent 55%), linear-gradient(130deg, rgba(12,22,40,0.95), rgba(16,30,53,0.9), rgba(9,14,24,0.94))" }}>
+          <div className="hero-overlay">
+            <div style={{ fontSize: 10, letterSpacing: 3, color: BLUE, fontWeight: 800 }}>SEASON {season} · ROUND {Math.min(raceIndex + 1, RACES_2026.length)}</div>
+            <div style={{ fontSize: 30, color: "#fff", fontWeight: 900, fontFamily: "'Arial Black', sans-serif" }}>{team.name}</div>
+            <div style={{ color: "#9fb3c8", fontSize: 12, marginBottom: 10 }}>Next race: {currentRace?.name || "Season complete"} · {currentRace?.circuit || "Awaiting calendar reset"}</div>
+            <div style={{ display: "flex", gap: 12, fontSize: 12 }}>
+              <span style={{ color: "#E2B53A", fontWeight: 800 }}>WCC P{teamPos || "—"}</span>
+              <span style={{ color: "#4ADE80", fontWeight: 800 }}>{teamPts} pts</span>
+            </div>
+          </div>
+        </div>
+        <div style={{ display: "grid", gap: 10 }}>
+          <DashCard title="CURRENT DRIVERS" accent={team.color}>{myDrivers.map(d => `${d.name.split(" ").pop()} (OVR ${d.ovr}, ${driverPoints[d.id] || 0} pts)`).join(" · ") || "No active drivers"}</DashCard>
+          <DashCard title="RACE WEEKEND PREP" accent="#60A5FA">{currentRace ? `${currentRace.name} · ${currentRace.laps} laps` : "No race scheduled"}.</DashCard>
+          <DashCard title="UPCOMING ITEMS" accent="#E2B53A">{notableNews.length ? notableNews.map(n => n.title).join(" · ") : "No notable updates yet."}</DashCard>
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+        <div className="card card-yellow" style={{ padding: 12 }}>
+          <div style={{ fontSize: 9, color: DIM, letterSpacing: 2, marginBottom: 8 }}>CONSTRUCTORS SNAPSHOT</div>
+          {compactConstructors.map((row, idx) => <div key={row.team?.id} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: `1px solid ${BORDER}` }}><span style={{ color: TEXT2 }}>P{idx + 1} {row.team?.name}</span><span style={{ color: "#E2B53A", fontWeight: 700 }}>{row.pts}</span></div>)}
+        </div>
+        <div className="card card-green" style={{ padding: 12 }}>
+          <div style={{ fontSize: 9, color: DIM, letterSpacing: 2, marginBottom: 8 }}>DRIVERS SNAPSHOT</div>
+          {compactDrivers.map((row, idx) => <div key={row.driver?.id} style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", borderBottom: `1px solid ${BORDER}` }}><span style={{ color: TEXT2 }}>P{idx + 1} {row.driver?.name}</span><span style={{ color: "#E2B53A", fontWeight: 700 }}>{row.pts}</span></div>)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function RaceTab({ currentRace, weekendPhase, qualiResults, qualiWeather, raceResult, raceRevealCount, revealCount, startQuali, startRace, nextWeekend, startNextSeason, team, raceIndex, driverStandings, constructorStandings, season, myDrivers, rivalry, simSeasonDev, openDriverCard }) {
   if (raceIndex >= RACES_2026.length) {
     const cPos = constructorStandings.findIndex(s => s.team?.id === team.id) + 1;
@@ -1516,6 +1566,7 @@ function StandingsTab({ driverStandings, constructorStandings, team, openDriverC
 
 function HistoryTab({ history, rivalry }) {
   const h = history || {};
+  const champions = h.champions || [];
   return (
     <div>
       <Sec>ALL-TIME RECORDS</Sec>
@@ -1542,6 +1593,27 @@ function HistoryTab({ history, rivalry }) {
         <DashCard title="SAVE MILESTONE" accent="#4ADE80">{h.totalRaces >= 100 ? "100+ races completed" : `${h.totalRaces || 0} races logged`}</DashCard>
         <DashCard title="HIGHLIGHT" accent="#C084FC">{h.seasons?.length ? `${h.seasons[h.seasons.length - 1].year} campaign complete` : "Run first season to unlock"}</DashCard>
       </div>
+
+      {champions.length > 0 && (
+        <div style={{ marginBottom: 24 }}>
+          <Sec>YEARLY CHAMPIONS</Sec>
+          <table style={{ width: "100%", maxWidth: 860, borderCollapse: "collapse" }}>
+            <thead><tr style={{ borderBottom: "1px solid " + BORDER2 }}>{["YEAR", "WDC", "WDC TEAM", "WDC PTS", "WCC", "WCC PTS"].map(col => <th key={col} style={{ textAlign: "left", padding: "6px 8px", fontSize: 8, color: DIM, letterSpacing: 2 }}>{col}</th>)}</tr></thead>
+            <tbody>
+              {[...champions].reverse().map((row, i) => (
+                <tr key={i} style={{ borderBottom: "1px solid " + BORDER }}>
+                  <td style={{ padding: "8px", color: "#fff", fontWeight: 700 }}>{row.year}</td>
+                  <td style={{ padding: "8px", color: GOLD }}>{row.wdc?.name || "—"}</td>
+                  <td style={{ padding: "8px", color: TEXT2 }}>{TEAMS.find(t => t.id === row.wdc?.teamId)?.name || "—"}</td>
+                  <td style={{ padding: "8px", color: "#E2B53A" }}>{row.wdc?.pts ?? "—"}</td>
+                  <td style={{ padding: "8px", color: BLUE }}>{row.wcc?.name || "—"}</td>
+                  <td style={{ padding: "8px", color: "#E2B53A" }}>{row.wcc?.pts ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {rivalry && rivalry.rivalName && (
         <div style={{ marginBottom: 24 }}>
@@ -1589,13 +1661,13 @@ function HistoryTab({ history, rivalry }) {
                 <tr key={i} style={{ borderBottom: "1px solid " + BORDER }}>
                   <td style={{ padding: "8px", color: "#fff", fontWeight: 700 }}>{s.year}</td>
                   <td style={{ padding: "8px" }}>
-                    <span style={{ color: s.wccPos <= 3 ? GOLD : TEXT2, fontWeight: 700 }}>P{s.wccPos}</span>
+                    <span style={{ color: s.wccPos <= 3 ? GOLD : TEXT2, fontWeight: 700 }}>P{s.wccPos ?? "—"}</span>
                   </td>
                   <td style={{ padding: "8px", color: GOLD, fontWeight: 700 }}>{s.wccPts}</td>
                   <td style={{ padding: "8px", fontSize: 11 }}>
                     {s.drivers.map((d, j) => (
                       <span key={j} style={{ color: d.pos <= 3 ? GOLD : TEXT2 }}>
-                        {d.name.split(" ").pop()} P{d.pos}{j < s.drivers.length - 1 ? " · " : ""}
+                        {d.name.split(" ").pop()} P{d.pos ?? "—"}{j < s.drivers.length - 1 ? " · " : ""}
                       </span>
                     ))}
                   </td>
