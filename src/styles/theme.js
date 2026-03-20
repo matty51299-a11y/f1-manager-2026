@@ -1,8 +1,8 @@
 /* THEME */
-const BG = "#C41E1E", BG2 = "#A81818", BG3 = "#8E1212";
-const BORDER = "rgba(255,255,255,0.18)", BORDER2 = "rgba(255,255,255,0.25)";
-const DIM = "rgba(255,255,255,0.5)", DIM2 = "rgba(255,255,255,0.35)", DIM3 = "rgba(255,255,255,0.18)";
-const TEXT = "#ffffff", TEXT2 = "rgba(255,255,255,0.85)";
+const BG = "#0B0D12", BG2 = "#11151D", BG3 = "#171C26";
+const BORDER = "rgba(255,255,255,0.16)", BORDER2 = "rgba(255,255,255,0.28)";
+const DIM = "rgba(255,255,255,0.62)", DIM2 = "rgba(255,255,255,0.42)", DIM3 = "rgba(255,255,255,0.22)";
+const TEXT = "#F8FAFC", TEXT2 = "rgba(248,250,252,0.88)";
 const GOLD = "#FFD700", BLUE = "#5B8DEF", BLUE2 = "#3B6FD9";
 
 const CAT_COLORS = {
