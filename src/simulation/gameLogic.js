@@ -283,7 +283,7 @@ function generateRace(qualiResults, race, weather, modifiers, teamCars) {
     const lowerTeamVariance = car <= 80 ? 1.3 : car <= 84 ? 0.8 : 0.3;
     trackForm[t.id] = (Math.random() - 0.5) * (2.2 + lowerTeamVariance) + getTeamMod(modifiers, t.id) * 2.1;
   });
-  const chaotic = Math.random() < 0.15;
+  const chaotic = Math.random() < 0.2;
 
   return qualiResults.map((d, gp) => {
     const cMod = getDriverMod(modifiers, d.id, "consistency");
@@ -297,12 +297,13 @@ function generateRace(qualiResults, race, weather, modifiers, teamCars) {
       + ((d.pace + pMod) * 1.6)
       + (isWet ? d.wet * 3.1 : 0);
     const gridBonus = (qualiResults.length - gp) * 2.25;
-    const underdogBonus = Math.max(0, (82 - carVal) * 0.72) + (gp > 12 ? 1.9 : 0);
-    const strategySwing = ((Math.random() - 0.5) * 2) * (carVal <= 82 ? 2.8 : 1.5);
+    const underdogBonus = Math.max(0, (83 - carVal) * 0.78) + (gp > 12 ? 2.2 : 0);
+    const strategySwing = ((Math.random() - 0.5) * 2) * (carVal <= 82 ? 3.4 : 1.8);
     const form = trackForm[d.teamId] || 0;
-    const luckRange = Math.max(2.3, (chaotic ? 10.5 : 5.2) - (consistency - 1) * 0.5);
+    const luckRange = Math.max(2.5, (chaotic ? 11.6 : 5.9) - (consistency - 1) * 0.45);
     const luck = (Math.random() - 0.5) * 2 * luckRange;
-    const dnfChance = Math.max(0.023, 0.046 - consistency * 0.003 + (gp > 15 ? 0.012 : 0) + (isWet ? 0.006 : 0));
+    const reliabilityStress = carVal <= 76 ? 0.012 : carVal <= 80 ? 0.008 : carVal <= 84 ? 0.004 : 0;
+    const dnfChance = Math.max(0.026, 0.05 - consistency * 0.003 + reliabilityStress + (gp > 15 ? 0.013 : 0) + (isWet ? 0.008 : 0));
     const dnf = Math.random() < dnfChance;
 
     return { ...d, raceScore: dnf ? -999 : carBase + driverBase + gridBonus + underdogBonus + strategySwing + form + luck, dnf, gridPos: gp + 1 };
@@ -410,12 +411,21 @@ function aiTransfers(drivers, prospects, teamId, newSeason, transitionNews, driv
       const replacementGap = bestMarket - value;
       const fitScore = d.ovr - (carNow >= 92 ? 84 : carNow >= 88 ? 81 : 78);
       const continuityBonus = retained.some(r => r.id === d.id) ? 0.12 : 0;
+      const expectedSalary = Math.max(2, Math.round((d.ovr - 62) / 6));
+      const salaryMismatch = Math.max(0, (d.salary || expectedSalary) - expectedSalary);
+      const marketPull = Math.max(0, replacementGap - 2);
+      const ambitionMismatch = carNow <= 79 && d.ovr >= 86 ? 0.08 : carNow <= 82 && d.ovr >= 88 ? 0.05 : 0;
+      const carUpgradeExpendable = carNow >= 90 && d.ovr <= 82 && replacementGap > 2;
       let resignChance = 0.64 + continuityBonus;
       if (value >= threshold) resignChance += 0.2;
       if (perfPts >= 100) resignChance += 0.15;
       else if (perfPts >= 50) resignChance += 0.08;
       if (fitScore >= 2) resignChance += 0.08;
       if (replacementGap > 6) resignChance -= 0.16;
+      if (marketPull > 0) resignChance -= Math.min(0.14, marketPull * 0.02);
+      if (salaryMismatch > 0) resignChance -= Math.min(0.12, salaryMismatch * 0.03);
+      if (ambitionMismatch > 0) resignChance -= ambitionMismatch;
+      if (carUpgradeExpendable) resignChance -= 0.1;
       if (d.ovr < 80) resignChance -= (d.lowOvrSeasons || 0) >= 2 ? 0.38 : 0.16;
       if (decline <= -2) resignChance -= 0.12;
       if (decline <= -4 && d.age >= 34) resignChance -= 0.3;
@@ -440,6 +450,10 @@ function aiTransfers(drivers, prospects, teamId, newSeason, transitionNews, driv
         const skipReason =
           (decline <= -4 && d.age >= 34)
             ? "driver declined automatically due to age/decline threshold"
+            : (salaryMismatch > 2)
+              ? "contract logic disqualified renewal for a specific rule"
+              : (ambitionMismatch > 0 || carUpgradeExpendable)
+                ? "team forced replacement due to major performance mismatch"
             : (replacementGap > 6)
               ? "team forced replacement due to major performance mismatch"
               : "contract logic disqualified renewal for a specific rule";
