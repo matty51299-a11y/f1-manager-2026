@@ -19,23 +19,23 @@ const F1_DRIVERS = [
   { name: "Lewis Hamilton", age: 41, ovr: 90, pace: 4, consistency: 5, wet: 5, teamId: "ferrari", salary: 40, contractEnd: 2027 },
   { name: "Charles Leclerc", age: 28, ovr: 93, pace: 5, consistency: 4, wet: 4, teamId: "ferrari", salary: 28, contractEnd: 2029 },
   { name: "Max Verstappen", age: 28, ovr: 97, pace: 5, consistency: 5, wet: 5, teamId: "redbull", salary: 55, contractEnd: 2028 },
-  { name: "Isack Hadjar", age: 21, ovr: 78, pace: 4, consistency: 3, wet: 3, teamId: "redbull", salary: 4, contractEnd: 2027 },
+  { name: "Isack Hadjar", age: 21, ovr: 82, pace: 4, consistency: 3, wet: 3, teamId: "redbull", salary: 4, contractEnd: 2027 },
   { name: "George Russell", age: 28, ovr: 91, pace: 5, consistency: 4, wet: 4, teamId: "mercedes", salary: 20, contractEnd: 2027 },
   { name: "Kimi Antonelli", age: 19, ovr: 82, pace: 5, consistency: 3, wet: 3, teamId: "mercedes", salary: 5, contractEnd: 2028 },
   { name: "Fernando Alonso", age: 44, ovr: 83, pace: 3, consistency: 5, wet: 5, teamId: "aston", salary: 18, contractEnd: 2026 },
-  { name: "Lance Stroll", age: 27, ovr: 74, pace: 3, consistency: 3, wet: 3, teamId: "aston", salary: 10, contractEnd: 2027 },
+  { name: "Lance Stroll", age: 27, ovr: 80, pace: 3, consistency: 3, wet: 3, teamId: "aston", salary: 10, contractEnd: 2027 },
   { name: "Pierre Gasly", age: 30, ovr: 82, pace: 4, consistency: 4, wet: 3, teamId: "alpine", salary: 10, contractEnd: 2028 },
-  { name: "Franco Colapinto", age: 21, ovr: 75, pace: 4, consistency: 3, wet: 3, teamId: "alpine", salary: 3, contractEnd: 2027 },
+  { name: "Franco Colapinto", age: 21, ovr: 80, pace: 4, consistency: 3, wet: 3, teamId: "alpine", salary: 3, contractEnd: 2027 },
   { name: "Carlos Sainz", age: 31, ovr: 88, pace: 4, consistency: 5, wet: 4, teamId: "williams", salary: 18, contractEnd: 2027 },
   { name: "Alex Albon", age: 30, ovr: 81, pace: 4, consistency: 3, wet: 3, teamId: "williams", salary: 8, contractEnd: 2027 },
-  { name: "Esteban Ocon", age: 29, ovr: 79, pace: 3, consistency: 4, wet: 3, teamId: "haas", salary: 6, contractEnd: 2027 },
-  { name: "Oliver Bearman", age: 21, ovr: 77, pace: 4, consistency: 3, wet: 3, teamId: "haas", salary: 3, contractEnd: 2027 },
-  { name: "Nico Hulkenberg", age: 38, ovr: 78, pace: 3, consistency: 4, wet: 3, teamId: "audi", salary: 6, contractEnd: 2028 },
-  { name: "Gabriel Bortoleto", age: 22, ovr: 76, pace: 4, consistency: 3, wet: 3, teamId: "audi", salary: 3, contractEnd: 2028 },
-  { name: "Liam Lawson", age: 24, ovr: 77, pace: 4, consistency: 3, wet: 3, teamId: "racingbulls", salary: 3, contractEnd: 2027 },
-  { name: "Arvid Lindblad", age: 18, ovr: 73, pace: 4, consistency: 3, wet: 2, teamId: "racingbulls", salary: 2, contractEnd: 2027 },
-  { name: "Sergio Perez", age: 36, ovr: 76, pace: 3, consistency: 4, wet: 3, teamId: "cadillac", salary: 8, contractEnd: 2027 },
-  { name: "Valtteri Bottas", age: 36, ovr: 75, pace: 3, consistency: 4, wet: 3, teamId: "cadillac", salary: 5, contractEnd: 2027 },
+  { name: "Esteban Ocon", age: 29, ovr: 81, pace: 3, consistency: 4, wet: 3, teamId: "haas", salary: 6, contractEnd: 2027 },
+  { name: "Oliver Bearman", age: 21, ovr: 80, pace: 4, consistency: 3, wet: 3, teamId: "haas", salary: 3, contractEnd: 2027 },
+  { name: "Nico Hulkenberg", age: 38, ovr: 80, pace: 3, consistency: 4, wet: 3, teamId: "audi", salary: 6, contractEnd: 2028 },
+  { name: "Gabriel Bortoleto", age: 22, ovr: 80, pace: 4, consistency: 3, wet: 3, teamId: "audi", salary: 3, contractEnd: 2028 },
+  { name: "Liam Lawson", age: 24, ovr: 80, pace: 4, consistency: 3, wet: 3, teamId: "racingbulls", salary: 3, contractEnd: 2027 },
+  { name: "Arvid Lindblad", age: 18, ovr: 80, pace: 4, consistency: 3, wet: 2, teamId: "racingbulls", salary: 2, contractEnd: 2027 },
+  { name: "Sergio Perez", age: 36, ovr: 80, pace: 3, consistency: 4, wet: 3, teamId: "cadillac", salary: 8, contractEnd: 2027 },
+  { name: "Valtteri Bottas", age: 36, ovr: 80, pace: 3, consistency: 4, wet: 3, teamId: "cadillac", salary: 5, contractEnd: 2027 },
 ];
 
 const PROSPECTS = [
@@ -59,7 +59,36 @@ const PROSPECTS = [
   { name: "Ugo Ugochukwu", age: 18, ovr: 63, pace: 4, consistency: 2, wet: 2, series: "F3", salary: 1, pot: 87 },
   { name: "Noel León", age: 20, ovr: 65, pace: 3, consistency: 3, wet: 2, series: "F2", salary: 1, pot: 78 },
   { name: "Mari Boya", age: 20, ovr: 64, pace: 3, consistency: 3, wet: 2, series: "F2", salary: 1, pot: 76 },
+  { name: "Theo Pourchaire", age: 24, ovr: 77, pace: 4, consistency: 4, wet: 3, series: "Reserve", salary: 3, pot: 82 },
+  { name: "Felipe Drugovich", age: 26, ovr: 75, pace: 4, consistency: 3, wet: 3, series: "Reserve", salary: 2, pot: 79 },
+  { name: "Mick Schumacher", age: 27, ovr: 73, pace: 3, consistency: 3, wet: 3, series: "Free Agent", salary: 2, pot: 77 },
+  { name: "Nyck de Vries", age: 31, ovr: 72, pace: 3, consistency: 3, wet: 3, series: "Free Agent", salary: 2, pot: 74 },
+  { name: "Robert Shwartzman", age: 27, ovr: 74, pace: 3, consistency: 4, wet: 3, series: "Reserve", salary: 2, pot: 78 },
+  { name: "Frederik Vesti", age: 24, ovr: 71, pace: 3, consistency: 3, wet: 3, series: "Reserve", salary: 1, pot: 79 },
+  { name: "Ayumu Iwasa", age: 24, ovr: 70, pace: 4, consistency: 3, wet: 3, series: "F2", salary: 1, pot: 80 },
+  { name: "Jak Crawford", age: 21, ovr: 69, pace: 4, consistency: 3, wet: 3, series: "F2", salary: 1, pot: 82 },
+  { name: "Pepe Martí", age: 20, ovr: 66, pace: 4, consistency: 3, wet: 2, series: "F2", salary: 1, pot: 81 },
+  { name: "Sebastian Montoya", age: 21, ovr: 65, pace: 3, consistency: 3, wet: 2, series: "F3", salary: 1, pot: 79 },
+  { name: "Marcus Armstrong", age: 26, ovr: 74, pace: 3, consistency: 4, wet: 3, series: "IndyCar", salary: 2, pot: 78 },
+  { name: "Santino Ferrucci", age: 28, ovr: 72, pace: 3, consistency: 3, wet: 3, series: "IndyCar", salary: 2, pot: 75 },
+  { name: "Romain Grosjean", age: 40, ovr: 70, pace: 3, consistency: 3, wet: 3, series: "Veteran", salary: 2, pot: 70 },
+  { name: "Daniil Kvyat", age: 32, ovr: 71, pace: 3, consistency: 3, wet: 3, series: "Veteran", salary: 2, pot: 73 },
 ];
+
+
+const TEAM_IDENTITIES = {
+  mclaren: { dev: 0.9, talent: 0.8, volatility: 0.3, focus: "aero" },
+  ferrari: { dev: 0.85, talent: 0.95, volatility: 0.45, focus: "power" },
+  redbull: { dev: 1.0, talent: 0.9, volatility: 0.35, focus: "aero" },
+  mercedes: { dev: 0.9, talent: 0.85, volatility: 0.3, focus: "reliability" },
+  aston: { dev: 0.65, talent: 0.6, volatility: 0.5, focus: "grip" },
+  alpine: { dev: 0.55, talent: 0.55, volatility: 0.65, focus: "power" },
+  williams: { dev: 0.6, talent: 0.5, volatility: 0.45, focus: "aero" },
+  haas: { dev: 0.45, talent: 0.45, volatility: 0.7, focus: "reliability" },
+  audi: { dev: 0.7, talent: 0.65, volatility: 0.55, focus: "power" },
+  racingbulls: { dev: 0.7, talent: 0.75, volatility: 0.55, focus: "aero" },
+  cadillac: { dev: 0.55, talent: 0.5, volatility: 0.8, focus: "grip" },
+};
 
 const RACES_2026 = [
   { name: "Australian GP", circuit: "Albert Park", country: "AUS", baseLap: 78.5, laps: 58 },
@@ -94,4 +123,4 @@ const WEATHER_TYPES = [
   { id: "storm", label: "STORM", icon: "⛈️", chance: 0.1 },
 ];
 
-export { TEAMS, F1_DRIVERS, PROSPECTS, RACES_2026, POINTS, WEATHER_TYPES };
+export { TEAMS, F1_DRIVERS, PROSPECTS, TEAM_IDENTITIES, RACES_2026, POINTS, WEATHER_TYPES };
