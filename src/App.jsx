@@ -759,7 +759,7 @@ export default function F1Manager() {
     if (myDrivers.length >= 2 || budget < pr.salary) return;
     const sn = genSigningNews(team, pr, raceIndex + 1);
     setGame(p => {
-      const newDrivers = [...p.drivers, { ...pr, teamId: team.id, contractEnd: season + 2 }];
+      const newDrivers = [...p.drivers, { ...pr, ovr: Math.max(80, pr.ovr), teamId: team.id, contractEnd: season + 2 }];
       const effects = applyNewsEffects(sn, { ...p, budget: p.budget - pr.salary });
       return { ...p, drivers: newDrivers, prospects: p.prospects.filter(x => x.id !== pr.id), budget: effects.budget - pr.salary, modifiers: effects.modifiers, news: [...sn, ...p.news] };
     });
