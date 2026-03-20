@@ -83,6 +83,54 @@ function DriverHistoryModal({ driver, season, driverPoints, driverSeasonStats, d
     </div>
   );
 }
+function DriverLink({ driver, onOpen, color = TEXT, weight = 700 }) {
+  if (!driver) return <span style={{ color }}>—</span>;
+  return (
+    <button onClick={() => onOpen?.(driver.id)} style={{ background: "transparent", border: "none", color, fontWeight: weight, cursor: "pointer", padding: 0, fontFamily: "inherit", textDecoration: "underline dotted", textUnderlineOffset: 2 }}>
+      {driver.name}
+    </button>
+  );
+}
+function DriverHistoryModal({ driver, season, driverPoints, driverSeasonStats, driverCareer, onClose }) {
+  if (!driver) return null;
+  const currentTeam = TEAMS.find(t => t.id === driver.teamId);
+  const currentSeason = driverSeasonStats?.[driver.id] || blankSeasonStats();
+  const historical = [...(driverCareer?.[driver.id]?.seasons || [])].reverse();
+  const rows = historical.length > 0
+    ? historical
+    : [{ season, points: driverPoints?.[driver.id] || currentSeason.points, wins: currentSeason.wins, podiums: currentSeason.podiums, poles: currentSeason.poles, position: null, teamName: currentTeam?.name || "Free Agent", ovr: driver.ovr }];
+  const yearsRemaining = driver.contractEnd ? Math.max(0, driver.contractEnd - season) : 0;
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={onClose}>
+      <div style={{ width: "min(940px, 96vw)", maxHeight: "90vh", overflow: "auto", background: BG2, border: `1px solid ${BORDER2}`, padding: 18 }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+          <div>
+            <div style={{ fontSize: 24, color: "#fff", fontWeight: 900, fontFamily: "'Arial Black', sans-serif" }}>{driver.name}</div>
+            <div style={{ fontSize: 11, color: DIM }}>Team: {currentTeam?.name || "Free Agent"} · Age {driver.age} · OVR {driver.ovr} · POT {driver.pot || "—"} · Contract years left {yearsRemaining}</div>
+          </div>
+          <button onClick={onClose} style={{ background: "transparent", border: `1px solid ${BORDER}`, color: TEXT2, cursor: "pointer", padding: "4px 10px", fontFamily: "inherit" }}>Close</button>
+        </div>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead><tr style={{ borderBottom: `1px solid ${BORDER2}` }}>{["SEASON", "TEAM", "OVR", "PTS", "W", "POD", "POLE", "FIN POS"].map(h => <th key={h} style={{ textAlign: "left", padding: "7px 8px", fontSize: 8, letterSpacing: 2, color: DIM }}>{h}</th>)}</tr></thead>
+          <tbody>
+            {rows.map((row, idx) => (
+              <tr key={idx} style={{ borderBottom: `1px solid ${BORDER}` }}>
+                <td style={{ padding: "8px", color: "#fff", fontWeight: 700 }}>{row.season}</td>
+                <td style={{ padding: "8px", color: TEXT2 }}>{row.teamName || "Free Agent"}</td>
+                <td style={{ padding: "8px", color: "#E2B53A" }}>{row.ovr ?? "—"}</td>
+                <td style={{ padding: "8px", color: "#E2B53A", fontWeight: 700 }}>{row.points ?? 0}</td>
+                <td style={{ padding: "8px", color: "#4ADE80" }}>{row.wins ?? 0}</td>
+                <td style={{ padding: "8px", color: BLUE }}>{row.podiums ?? 0}</td>
+                <td style={{ padding: "8px", color: "#C084FC" }}>{row.poles ?? 0}</td>
+                <td style={{ padding: "8px", color: TEXT2 }}>{row.position ? `P${row.position}` : "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 const blankSeasonStats = () => ({ points: 0, wins: 0, podiums: 0, poles: 0, races: 0, finishes: 0, sumFinish: 0, dnfs: 0 });
 const avgFinish = (st) => (st.finishes > 0 ? (st.sumFinish / st.finishes).toFixed(2) : "—");
 const CAR_OVERALL_FLOOR = 70;
