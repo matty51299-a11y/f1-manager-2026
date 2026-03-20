@@ -66,6 +66,11 @@ You run an F1 team across multiple seasons: hire drivers, manage contracts/budge
 - Update this file at the end of each dev session.
 
 ## Change Log
+### v0.1.4
+- Added stronger top-team downside risk in car evolution (larger elite stall/miss exposure and heavier diminishing returns).
+- Increased bounded race variability/attrition and underdog opportunity to reduce zero-point seasons and improve lower-half points access.
+- Extended dev summary diagnostics with constructor gap and points-bucket visibility for championship spread tuning.
+
 ### v0.1.3
 - Replaced hard active-grid 80 OVR clamping with entry-based F1 seat floor behavior.
 - Added stronger seat-loss pressure for sub-80 active drivers, including multi-season low-rating penalties in AI retention.

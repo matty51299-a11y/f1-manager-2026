@@ -406,11 +406,13 @@ export default function F1Manager() {
       if (d.ovr >= 94) ovrChange += pick([-3, -2, -2, -1, 0]);
       else if (d.ovr >= 92) ovrChange += pick([-2, -1, -1, 0, 0, 1]);
       else if (d.ovr >= 90) ovrChange += pick([-1, -1, 0, 0, 1]);
+      else if (d.ovr >= 86 && newAge >= 29) ovrChange += pick([-1, -1, 0, 0, 1]);
       if (perfPts >= 220) ovrChange += 3;
       else if (perfPts >= 130) ovrChange += 2;
       else if (perfPts >= 60) ovrChange += 1;
       else if (perfPts <= 3 && newAge >= 30) ovrChange -= 2;
       else if (perfPts <= 10 && newAge >= 30) ovrChange -= 1;
+      if (d.ovr >= 86 && perfPts < 70 && maybe(0.25)) ovrChange -= 1;
       if (newAge >= 23 && newAge <= 31 && pot >= 84 && maybe(0.2)) ovrChange += 1;
       if (d.ovr >= 80 && d.ovr <= 82 && perfPts >= 45 && maybe(0.25)) ovrChange += 1;
       if (newAge <= 24 && pot >= 90 && maybe(0.22)) ovrChange += pick([2, 3]);
@@ -482,14 +484,15 @@ export default function F1Manager() {
       const oldProfile = prevProfiles[t.id] || { aero: t.car, power: t.car, grip: t.car - 1, tyreWear: t.car - 2, reliability: t.car - 1, overall: t.car };
       const tCPos = cStandings.findIndex(s => s.team?.id === t.id) + 1;
       const finishBonus = tCPos > 0 ? (12 - tCPos) * 0.12 : 0;
-      const catchup = (80 - oldProfile.overall) * 0.08;
-      const elitePenalty = oldProfile.overall >= 92 ? 1.6 : oldProfile.overall >= 88 ? 1.0 : oldProfile.overall >= 84 ? 0.45 : 0;
+      const catchup = (80 - oldProfile.overall) * 0.08 + (oldProfile.overall < 76 ? 0.7 : oldProfile.overall < 80 ? 0.35 : 0);
+      const elitePenalty = oldProfile.overall >= 94 ? 2.5 : oldProfile.overall >= 92 ? 2.0 : oldProfile.overall >= 88 ? 1.2 : oldProfile.overall >= 84 ? 0.5 : 0;
+      const eliteStallRisk = oldProfile.overall >= 92 ? 0.22 : oldProfile.overall >= 89 ? 0.12 : 0.04;
       const conceptRoll = Math.random();
-      const conceptDelta = conceptRoll < 0.18
-        ? -pick([5, 4, 4, 3])
-        : conceptRoll < 0.36
+      const conceptDelta = conceptRoll < (0.18 + eliteStallRisk)
+        ? -pick([6, 5, 4, 4, 3])
+        : conceptRoll < (0.36 + eliteStallRisk)
           ? -pick([3, 2, 2, 1])
-          : conceptRoll < 0.78
+          : conceptRoll < (0.78 + eliteStallRisk * 0.3)
             ? pick([-2, -1, -1, 0, 1, 1, 2])
             : pick([2, 2, 3, 3, 4]);
       const attrs = ["aero", "power", "grip", "tyreWear", "reliability"];
@@ -648,8 +651,20 @@ export default function F1Manager() {
         .slice(0, 5)
         .map(d => `${d.name.split(" ").pop()} ${d.ovr}/${d.pot}`);
       const sortedCars = Object.entries(next.teamCars || {}).map(([id, rating]) => ({ team: TEAMS.find(t => t.id === id), rating })).sort((a, b) => b.rating - a.rating);
-      const zeroPointTeams = buildConstructorStandings(sim.constructorPoints).filter(s => s.pts === 0).map(s => s.team?.name).filter(Boolean);
-      const constructorOrder = buildConstructorStandings(sim.constructorPoints).map((s, idx) => `P${idx + 1} ${s.team?.name} (${s.pts})`).join(" · ");
+      const fullStandings = buildConstructorStandings(sim.constructorPoints);
+      const zeroPointTeams = fullStandings.filter(s => s.pts === 0).map(s => s.team?.name).filter(Boolean);
+      const lowPointsTeams = fullStandings.filter(s => s.pts >= 1 && s.pts <= 10).length;
+      const midPointsTeams = fullStandings.filter(s => s.pts >= 11 && s.pts <= 50).length;
+      const highPointsTeams = fullStandings.filter(s => s.pts > 50).length;
+      const p1p2Gap = (fullStandings[0]?.pts || 0) - (fullStandings[1]?.pts || 0);
+      const p2p4Gap = (fullStandings[1]?.pts || 0) - (fullStandings[3]?.pts || 0);
+      const constructorOrder = fullStandings.map((s, idx) => `P${idx + 1} ${s.team?.name} (${s.pts})`).join(" · ");
+      const lowerHalfTeams = fullStandings.slice(Math.floor(fullStandings.length / 2)).map(s => s.team?.id);
+      const lowerHalfPointsFinishes = (sim.raceResults || []).reduce((sum, rr) => {
+        const pointFinishers = rr.results.slice(0, 10).filter(r => !r.dnf && lowerHalfTeams.includes(r.teamId)).length;
+        return sum + pointFinishers;
+      }, 0);
+      const avgLowerHalfPointFinishes = sim.raceResults?.length ? (lowerHalfPointsFinishes / sim.raceResults.length).toFixed(2) : "0.00";
       const topCarTeams = sortedCars.slice(0, 3);
       const topTeamDriverAvg = topCarTeams.map(tc => {
         const td = next.drivers.filter(d => d.teamId === tc.team?.id);
@@ -669,7 +684,7 @@ export default function F1Manager() {
         .map(row => `${row.team?.name} (car P${row.carRank}, drivers P${row.driverRank})`);
       const summary = makeNews(
         "Dev Sim Summary",
-        `WDC: ${topD?.driver?.name || "—"}. WCC: ${topC?.team?.name || "—"}. Duplicates: ${duplicateNames.length ? duplicateNames.join(", ") : "none"}. Active <80: ${activeBelow80}. Active OVR80+/85+: ${activeOver80}/${activeOver85}. Active buckets 80-82/83-85/86+: ${bucket8082}/${bucket8385}/${bucket86plus}. Avg grid OVR: ${avgGridOvr}. Lowest starter: ${lowestStarter ? `${lowestStarter.name} ${lowestStarter.ovr}` : "—"}. Top U22 prospects: ${topYoungProspects.length ? topYoungProspects.join(", ") : "none"}. Top10 OVR: ${top10Ratings.map(d => `${d.name.split(" ").pop()} ${d.ovr}`).join(", ")}. OVR90+/92+/95+: ${over90}/${over92}/${over95}. OVR80+: ${over80.length}. Top-car team avg OVR: ${topTeamDriverAvg}. Car-driver mismatch: ${mismatchTeams.length ? mismatchTeams.join(", ") : "none"}. Car range: ${sortedCars[sortedCars.length - 1]?.rating ?? "—"}-${sortedCars[0]?.rating ?? "—"}. Zero-point teams: ${zeroPointTeams.length ? zeroPointTeams.join(", ") : "none"}. Constructors: ${constructorOrder}.`,
+        `WDC: ${topD?.driver?.name || "—"}. WCC: ${topC?.team?.name || "—"}. Gaps P1-P2/P2-P4: ${p1p2Gap}/${p2p4Gap}. Team buckets 0/1-10/11-50/50+: ${zeroPointTeams.length}/${lowPointsTeams}/${midPointsTeams}/${highPointsTeams}. Lower-half points finishers/race: ${avgLowerHalfPointFinishes}. Duplicates: ${duplicateNames.length ? duplicateNames.join(", ") : "none"}. Active <80: ${activeBelow80}. Active OVR80+/85+: ${activeOver80}/${activeOver85}. Active buckets 80-82/83-85/86+: ${bucket8082}/${bucket8385}/${bucket86plus}. Avg grid OVR: ${avgGridOvr}. Lowest starter: ${lowestStarter ? `${lowestStarter.name} ${lowestStarter.ovr}` : "—"}. Top U22 prospects: ${topYoungProspects.length ? topYoungProspects.join(", ") : "none"}. Top10 OVR: ${top10Ratings.map(d => `${d.name.split(" ").pop()} ${d.ovr}`).join(", ")}. OVR90+/92+/95+: ${over90}/${over92}/${over95}. OVR80+: ${over80.length}. Top-car team avg OVR: ${topTeamDriverAvg}. Car-driver mismatch: ${mismatchTeams.length ? mismatchTeams.join(", ") : "none"}. Car range: ${sortedCars[sortedCars.length - 1]?.rating ?? "—"}-${sortedCars[0]?.rating ?? "—"}. Zero-point teams: ${zeroPointTeams.length ? zeroPointTeams.join(", ") : "none"}. Constructors: ${constructorOrder}.`,
         "Team",
         0
       );
