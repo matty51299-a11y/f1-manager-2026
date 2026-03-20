@@ -432,6 +432,7 @@ export default function F1Manager() {
       else if (d.ovr >= 92) ovrChange += pick([-2, -1, -1, 0, 0, 1]);
       else if (d.ovr >= 90) ovrChange += pick([-1, -1, 0, 0, 1]);
       else if (d.ovr >= 86 && newAge >= 29) ovrChange += pick([-1, -1, 0, 0, 1]);
+      if (d.ovr >= 88 && maybe(0.22)) ovrChange -= 1;
       if (perfPts >= 220) ovrChange += 3;
       else if (perfPts >= 130) ovrChange += 2;
       else if (perfPts >= 60) ovrChange += 1;
@@ -447,7 +448,8 @@ export default function F1Manager() {
       ovrChange = Math.max(-6, Math.min(6, ovrChange));
       const legacyLongevity = d.ovr >= 93 && perfPts >= 180 && maybe(0.08);
       const maxAllowed = (newAge <= 24 ? 96 : newAge <= 28 ? 95 : newAge <= 31 ? 94 : newAge <= 34 ? 92 : 90) + (legacyLongevity ? 1 : 0);
-      const newOvr = Math.max(55, Math.min(maxAllowed, d.ovr + ovrChange));
+      let newOvr = Math.max(55, Math.min(maxAllowed, d.ovr + ovrChange));
+      if (newOvr > 90 && newAge > 24 && maybe(0.28)) newOvr -= 1;
       const newPot = Math.max(newOvr + 1, Math.min(99, pot + (newAge <= 22 && maybe(0.3) ? 1 : 0) - (newAge >= 31 ? 1 : 0)));
       const lowOvrSeasons = d.teamId !== null ? (newOvr < 80 ? (d.lowOvrSeasons || 0) + 1 : 0) : 0;
       return { ...d, age: newAge, ovr: newOvr, pot: newPot, _ovrDelta: ovrChange, lowOvrSeasons };
@@ -589,6 +591,9 @@ export default function F1Manager() {
     });
     const lowestNewSeatOvr = newSeatSignings.length ? Math.min(...newSeatSignings.map(d => d.ovr)) : null;
     const reSigningsCount = transitionNews.filter(n => n.title.includes("Re-Sign")).length;
+    if (transferStats.expiringContracts > 0 && transferStats.renewalAttempts === 0) {
+      transitionNews.push(makeNews("Renewal Attempt Error", `Expiring contracts detected (${transferStats.expiringContracts}) but renewal attempts were zero.`, "Board", 0));
+    }
     if (devSwing[0]?.diff > 0) transitionNews.push(makeNews(`Development Movers: ${devSwing[0].team.name}`, `${devSwing[0].team.name} made the biggest winter jump (+${devSwing[0].diff}).`, "Development", 0));
     if (devSwing[devSwing.length - 1]?.diff < 0) transitionNews.push(makeNews(`Development Setback: ${devSwing[devSwing.length - 1].team.name}`, `${devSwing[devSwing.length - 1].team.name} suffered the sharpest decline (${devSwing[devSwing.length - 1].diff}).`, "Development", 0));
     if (driverSwing[0]?.diff > 0) transitionNews.push(makeNews(`Breakout Watch: ${driverSwing[0].driver.name}`, `${driverSwing[0].driver.name} posted the biggest offseason rise (+${driverSwing[0].diff} OVR).`, "Driver", 0));

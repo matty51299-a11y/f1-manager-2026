@@ -369,14 +369,21 @@ function aiTransfers(drivers, prospects, teamId, newSeason, transitionNews, driv
     }
 
     // Re-sign top expiring drivers first (strong teams keep stars)
-    const expiringDrivers = updatedDrivers
-      .filter(d => expiringIds.has(d.id))
+    const expiringDrivers = (expiringByTeam?.[t.id] || [])
+      .map(id => drivers.find(d => d.id === id) || updatedDrivers.find(d => d.id === id))
+      .filter(Boolean)
       .sort((a, b) => driverValue(b) - driverValue(a));
     transferStats.eligibleRenewals += expiringDrivers.length;
 
+    let teamRenewalAttempts = 0;
     expiringDrivers.forEach(d => {
-      if (lineup.length >= 2) return;
       transferStats.renewalAttempts += 1;
+      teamRenewalAttempts += 1;
+      const disqualified = lineup.length >= 2 && !lineup.some(x => x.id === d.id);
+      if (disqualified) {
+        transferStats.replacementChoices += 1;
+        return;
+      }
       const value = driverValue(d);
       const perfPts = driverPoints?.[d.id] || 0;
       const decline = d._ovrDelta || 0;
@@ -412,6 +419,9 @@ function aiTransfers(drivers, prospects, teamId, newSeason, transitionNews, driv
         transferStats.replacementChoices += 1;
       }
     });
+    if (expiringDrivers.length > 0 && teamRenewalAttempts === 0) {
+      transitionNews.push(makeNews("Renewal Logic Warning", `${t.name} had expiring contracts but recorded zero renewal attempts.`, "Team", 0));
+    }
 
     // Fill remaining seats from best available options weighted by team strength
     while (lineup.length < 2) {

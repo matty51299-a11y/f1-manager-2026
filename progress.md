@@ -66,6 +66,11 @@ You run an F1 team across multiple seasons: hire drivers, manage contracts/budge
 - Update this file at the end of each dev session.
 
 ## Change Log
+### v0.1.9
+- Fixed renewal phase execution ordering/coverage and added explicit guardrails when expiring contracts exist with zero renewal attempts.
+- Increased soft top-end OVR normalization pressure to reduce long-run 86+/90+ saturation.
+- Added stronger offseason/debug validation around renewal attempts, continuity, and retirement age-band realism.
+
 ### v0.1.8
 - Added explicit transfer renewal accounting (expiring, eligible, attempts, accepted renewals, replacement choices) for offseason diagnostics.
 - Strengthened weak-incumbent replacement pressure while preserving continuity-friendly renewal behavior.
