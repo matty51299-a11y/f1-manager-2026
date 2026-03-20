@@ -935,7 +935,7 @@ export default function F1Manager() {
       </div>
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", borderBottom: `1px solid ${BORDER}`, background: "linear-gradient(90deg, #0a0f1f, #13233f)", boxShadow: "0 8px 20px rgba(0,0,0,0.22)", flexWrap: "wrap", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 22px", borderBottom: `1px solid ${BORDER}`, background: "linear-gradient(90deg, #070b18, #13233f)", boxShadow: "0 10px 24px rgba(0,0,0,0.3), 0 0 14px rgba(79,140,255,0.2)", flexWrap: "wrap", gap: 14 }}>
           <div style={{ display: "flex", gap: 28, alignItems: "center" }}>
             <TS label="WCC" value={myCP} sub={cRank ? `P${cRank}` : "—"} color={team.color} />
             <TS label={myD1?.name?.split(" ").pop() || "—"} value={myD1 ? (driverPoints[myD1.id] || 0) : "—"} sub={d1Rank ? `P${d1Rank}` : ""} />
@@ -1077,16 +1077,26 @@ function RaceTab({ currentRace, weekendPhase, qualiResults, qualiWeather, raceRe
 
   return (
     <div>
-        <div className="card card-blue" style={{ marginBottom: 24, padding: "20px 24px", background: BG3, border: `1px solid ${BORDER}` }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
-          <div>
-            <div style={{ fontSize: 10, color: BLUE, letterSpacing: 3, marginBottom: 6, fontWeight: 700 }}>ROUND {raceIndex + 1}</div>
-            <div style={{ fontSize: 28, fontWeight: 900, color: "#fff", fontFamily: "'Arial Black', sans-serif", marginBottom: 4 }}>{currentRace.name}</div>
-            <div style={{ fontSize: 11, color: DIM }}>{currentRace.circuit} · {currentRace.laps} laps</div>
+      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16, marginBottom: 24, alignItems: "stretch" }}>
+        <div className="hero card card-blue" style={{ backgroundImage: `radial-gradient(circle at 20% 15%, rgba(79,140,255,0.35), transparent 55%), linear-gradient(130deg, rgba(13,22,38,0.9), rgba(22,38,68,0.86), rgba(11,17,30,0.9))` }}>
+          <div className="hero-overlay">
+            <div style={{ fontSize: 10, color: BLUE, letterSpacing: 3, marginBottom: 6, fontWeight: 800 }}>ROUND {raceIndex + 1}</div>
+            <div style={{ fontSize: 34, fontWeight: 900, color: "#fff", fontFamily: "'Arial Black', sans-serif", marginBottom: 4 }}>{currentRace.name}</div>
+            <div style={{ fontSize: 12, color: DIM, marginBottom: 8 }}>{currentRace.circuit} · {currentRace.laps} laps</div>
+            <div style={{ fontSize: 10, color: "#9fb3c8", letterSpacing: 2, marginBottom: 12 }}>{weekendPhase === "preview" ? "LIGHTS OUT AWAITS" : weekendPhase === "quali_reveal" ? "QUALIFYING LIVE" : "RACE DAY ENGAGED"}</div>
+            {weekendPhase === "preview" && <button onClick={startQuali} className="btn-primary" style={{ padding: "15px 52px", color: "#fff", cursor: "pointer", fontSize: 14, fontWeight: 800, letterSpacing: 3, fontFamily: "inherit", alignSelf: "flex-start" }}>BEGIN QUALIFYING</button>}
           </div>
-          <div style={{ fontSize: 48, fontWeight: 900, color: "rgba(255,255,255,0.04)", fontFamily: "'Arial Black', sans-serif", lineHeight: 1 }}>{currentRace.country}</div>
         </div>
-        <div style={{ display: "flex", gap: 0, marginTop: 20 }}>
+        <div className="info-stack">
+          <DashCard title="CIRCUIT INFO" accent={BLUE}>{currentRace.circuit} · {currentRace.laps} laps</DashCard>
+          <DashCard title="CHAMPIONSHIP" accent="#E2B53A">{gapToLead > 0 ? `${gapToLead} pts behind P1` : `Leading by ${Math.abs(gapToLead)} pts`} · {constructorStandings.findIndex(s => s.team?.id === team.id) + 1 > 0 ? `P${constructorStandings.findIndex(s => s.team?.id === team.id) + 1}` : "No rank yet"}</DashCard>
+          <DashCard title="RIVALRY" accent="#F87171">{rivalry?.rivalName ? `${rivalry.rivalName} (${rivalry.gap >= 0 ? "+" : ""}${rivalry.gap})` : "Rivalry will appear once standings settle."}</DashCard>
+          <DashCard title="STRATEGY / CONDITIONS" accent="#4ADE80">{weekendPhase === "quali_reveal" ? (qualiWeather?.label || "Forecast pending") : (raceResult?.weather?.label || "Dry-biased conditions")}</DashCard>
+        </div>
+      </div>
+
+      <div className="card card-blue" style={{ marginBottom: 20, padding: "14px 16px" }}>
+        <div style={{ display: "flex", gap: 0 }}>
           {steps.map(s => {
             const active = (weekendPhase === "preview" && s.id === "preview") || (weekendPhase === "quali_reveal" && s.id === "quali") || ((weekendPhase === "race_reveal" || weekendPhase === "race_done") && s.id === "race");
             return (<div key={s.id} style={{ flex: 1 }}><div style={{ height: 3, background: s.done ? team.color : active ? `${team.color}88` : "rgba(0,0,0,0.15)", transition: "all 0.5s" }} /><div style={{ fontSize: 9, letterSpacing: 2, marginTop: 6, color: active ? "#fff" : s.done ? team.color : DIM3 }}>{s.label}</div></div>);
@@ -1094,31 +1104,10 @@ function RaceTab({ currentRace, weekendPhase, qualiResults, qualiWeather, raceRe
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12, marginBottom: 18, alignItems: "stretch" }}>
-        <div className="card card-blue" style={{ background: BG3, border: `1px solid ${BORDER}`, padding: "18px 20px" }}>
-          {weekendPhase === "preview" ? (
-            <div style={{ textAlign: "center", padding: "20px 0" }}>
-              <div style={{ fontSize: 11, color: DIM, letterSpacing: 2, marginBottom: 14 }}>LIGHTS OUT AWAITS</div>
-              <button onClick={startQuali} className="btn-primary" style={{ padding: "14px 48px", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 800, letterSpacing: 3, fontFamily: "inherit" }}>BEGIN QUALIFYING →</button>
-            </div>
-          ) : (
-            <div style={{ fontSize: 11, color: TEXT2, lineHeight: 1.6 }}>
-              <div style={{ fontSize: 9, color: DIM, letterSpacing: 2, marginBottom: 8 }}>WEEKEND STORYLINE</div>
-              {weekendPhase === "quali_reveal" ? `Qualifying is underway at ${currentRace.circuit}. Track position is critical here and could define your race trajectory.` : `Race day at ${currentRace.name}: championship pressure is building with ${RACES_2026.length - raceIndex - 1} rounds after this.`}
-            </div>
-          )}
-        </div>
-        <div style={{ display: "grid", gap: 8 }}>
-          <DashCard title="CIRCUIT INFO" accent={BLUE}>{currentRace.circuit} · {currentRace.laps} laps</DashCard>
-          <DashCard title="CHAMPIONSHIP" accent="#E2B53A">{gapToLead > 0 ? `${gapToLead} pts behind P1` : `Leading by ${Math.abs(gapToLead)} pts`} · {constructorStandings.findIndex(s => s.team?.id === team.id) + 1 > 0 ? `P${constructorStandings.findIndex(s => s.team?.id === team.id) + 1}` : "No rank yet"}</DashCard>
-          <DashCard title="RIVALRY" accent="#F87171">{rivalry?.rivalName ? `${rivalry.rivalName} (${rivalry.gap >= 0 ? "+" : ""}${rivalry.gap})` : "Rivalry will appear once standings settle."}</DashCard>
-        </div>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(120px, 1fr))", gap: 8, marginBottom: 10, maxWidth: 900 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(120px, 1fr))", gap: 10, marginBottom: 14, maxWidth: 900 }}>
         <DashCard title="PROJECTED LEAD" accent={team.color}>{projected[0] ? `${projected[0].name.split(" ").pop()} (${projected[0].projection})` : "—"}</DashCard>
         <DashCard title="TEAM EXPECTATION" accent="#4ADE80">{myDrivers.length >= 2 ? "Target: double points finish" : "Sign a second driver to maximize points."}</DashCard>
-        <DashCard title="CONDITIONS" accent="#60A5FA">{weekendPhase === "quali_reveal" ? (qualiWeather?.label || "Forecast pending") : (raceResult?.weather?.label || "Dry-biased conditions")}</DashCard>
+        <DashCard title="RACE STATUS" accent="#60A5FA">{weekendPhase === "preview" ? "Awaiting qualifying run" : weekendPhase === "quali_reveal" ? "Grid forming now" : weekendPhase === "race_reveal" ? "Race in progress" : "Weekend complete"}</DashCard>
       </div>
       <div style={{ marginBottom: 18 }}>
         <button onClick={simSeasonDev} style={{ padding: "8px 14px", background: "rgba(192,132,252,0.18)", border: "1px solid rgba(192,132,252,0.45)", color: "#C084FC", fontFamily: "inherit", fontSize: 10, letterSpacing: 1, fontWeight: 700, cursor: "pointer" }}>SIM SEASON (DEV)</button>
@@ -1213,8 +1202,17 @@ function SquadTab({ myDrivers, team, driverPoints, releaseDriver, season, openDr
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, maxWidth: 780 }}>
       {myDrivers.map((d, i) => (
         <div key={d.id} className="card card-blue" style={{ background: BG3, border: `1px solid ${BORDER}`, padding: 18 }}>
+          <div className="driver-card" style={{ backgroundImage: `radial-gradient(circle at 70% 20%, rgba(79,140,255,0.32), transparent 60%), linear-gradient(135deg, rgba(17,24,39,0.94), rgba(31,41,62,0.92), rgba(8,12,21,0.96))`, marginBottom: 14 }}>
+            <div className="driver-overlay">
+              <div style={{ fontSize: 9, color: BLUE, letterSpacing: 2, marginBottom: 2 }}>DRIVER {i + 1}</div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ fontSize: 15, fontWeight: 900, color: "#fff", fontFamily: "'Arial Black', sans-serif" }}><DriverLink driver={d} onOpen={openDriverCard} color="#fff" /></div>
+                <div style={{ fontSize: 13, color: "#E2B53A", fontWeight: 800 }}>OVR {d.ovr}</div>
+              </div>
+            </div>
+          </div>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
-            <div><div style={{ fontSize: 9, color: BLUE, letterSpacing: 2, marginBottom: 3 }}>DRIVER {i + 1}</div><div style={{ fontSize: 16, fontWeight: 900, color: "#fff", fontFamily: "'Arial Black', sans-serif" }}><DriverLink driver={d} onOpen={openDriverCard} color="#fff" /></div><div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>Age {d.age} · OVR <span style={{ color: "#E2B53A" }}>{d.ovr}</span></div></div>
+            <div><div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>Age {d.age} · Contract {d.contractEnd}</div></div>
             <div style={{ textAlign: "right" }}><div style={{ fontSize: 24, fontWeight: 900, color: team.color, fontFamily: "'Arial Black', sans-serif" }}>{driverPoints[d.id] || 0}</div><div style={{ fontSize: 9, color: DIM }}>PTS</div></div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
