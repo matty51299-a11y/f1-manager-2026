@@ -66,6 +66,11 @@ You run an F1 team across multiple seasons: hire drivers, manage contracts/budge
 - Update this file at the end of each dev session.
 
 ## Change Log
+### v0.1.6
+- Rebalanced AI re-signing so contract renewals are now a common outcome for fitting/performing drivers, reducing unrealistic yearly churn.
+- Removed artificial seat-entry OVR inflation and improved prospect generation toward naturally F1-ready high-end youth.
+- Expanded dev diagnostics with lineup continuity, re-sign counts, and lowest OVR among newly signed race-seat drivers.
+
 ### v0.1.5
 - Introduced centralized `ensureValidTeamRosters` hard validation and emergency fallback to guarantee exactly 2 drivers per team.
 - Added roster enforcement checkpoints across qualifying/race flow, offseason transitions, and full dev-season simulations.

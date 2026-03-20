@@ -82,7 +82,7 @@ function ensureProfileData(state) {
 
 function ratedProspectToDriver(pr, teamId, newSeason) {
   const years = pr.ovr >= 80 ? 2 : 1;
-  return { ...pr, ovr: Math.max(80, pr.ovr), teamId, contractEnd: newSeason + years };
+  return { ...pr, teamId, contractEnd: newSeason + years };
 }
 
 function ensureValidTeamRosters(drivers, prospects, newSeason, transitionNews = []) {
@@ -142,7 +142,7 @@ function ensureValidTeamRosters(drivers, prospects, newSeason, transitionNews = 
       if (fa) {
         const idx = fixedDrivers.findIndex(d => d.id === fa.id);
         if (idx >= 0) {
-          fixedDrivers[idx] = { ...fixedDrivers[idx], ovr: Math.max(80, fixedDrivers[idx].ovr), teamId: t.id, contractEnd: newSeason + (fa.ovr >= 84 ? 2 : 1) };
+          fixedDrivers[idx] = { ...fixedDrivers[idx], teamId: t.id, contractEnd: newSeason + (fa.ovr >= 84 ? 2 : 1) };
           transitionNews.push(makeNews(
             `${t.name} Finalize ${fa.name}`,
             `${t.name} fill an open seat via free agency to satisfy the 2-driver roster requirement.`,
@@ -163,7 +163,7 @@ function ensureValidTeamRosters(drivers, prospects, newSeason, transitionNews = 
         } else {
           const emergency = makeEmergencyDriver();
           emergencyGenerated += 1;
-          fixedDrivers.push({ ...emergency, ovr: Math.max(80, emergency.ovr), teamId: t.id, contractEnd: newSeason + 1 });
+          fixedDrivers.push({ ...emergency, teamId: t.id, contractEnd: newSeason + 1 });
           transitionNews.push(makeNews(
             `${t.name} Sign Emergency Reserve`,
             `${t.name} sign ${emergency.name} as an emergency replacement to keep the grid full.`,
@@ -397,6 +397,7 @@ export default function F1Manager() {
   const runOffseason = (p) => {
     const team = p.team;
     const newSeason = p.season + 1;
+    const previousLineups = Object.fromEntries(TEAMS.map(t => [t.id, p.drivers.filter(d => d.teamId === t.id).map(d => d.id).sort((a, b) => a - b)]));
     const cStandings = buildConstructorStandings(p.constructorPoints);
     const cPos = cStandings.findIndex(s => s.team?.id === team.id) + 1;
 
@@ -477,15 +478,15 @@ export default function F1Manager() {
     const freshProspects = Array.from({ length: 8 }, (_, i) => {
       const isF3 = i < 3;
       const isReserve = i >= 5;
-      const isEliteProspect = i === 0 ? maybe(0.35) : maybe(0.18);
+      const isEliteProspect = i === 0 ? maybe(0.4) : maybe(0.2);
       const baseAge = isF3 ? 18 : isReserve ? pick([24, 25, 26, 31]) : 19;
       const series = isF3 ? "F3" : isReserve ? pick(["Reserve", "Veteran", "Free Agent"]) : "F2";
       const baseOvr = isEliteProspect
-        ? pick([72, 73, 74, 75, 76, 77, 78, 79, 80, 81])
+        ? pick([76, 76, 77, 77, 78, 78, 79, 79, 80])
         : isF3 ? 60 + Math.floor(Math.random() * 7) : isReserve ? 70 + Math.floor(Math.random() * 8) : 63 + Math.floor(Math.random() * 9);
       const potBase = isEliteProspect ? pick([92, 93, 94, 95, 96]) : (isReserve ? 6 : 12) + Math.floor(Math.random() * 8);
       const pot = isEliteProspect ? Math.min(98, potBase + Math.floor(Math.random() * 2)) : Math.min(96, baseOvr + potBase);
-      const readyNudge = isEliteProspect && maybe(0.4) ? 1 : 0;
+      const readyNudge = isEliteProspect && maybe(0.25) ? 1 : 0;
       return { name: generateUniqueName(usedGeneratedNames, firstNames, lastNames), age: baseAge, ovr: baseOvr + readyNudge, pace: pick([3, 4, 4, 5]), consistency: pick([2, 3, 4, 4]), wet: pick([2, 3, 4]), series, salary: Math.max(1, Math.round(baseOvr / 28)), pot, id: 200 + newSeason * 10 + i + Math.floor(Math.random() * 500), teamId: null, contractEnd: null };
     });
     const allProspects = [...refreshedProspects, ...freshProspects];
@@ -558,12 +559,28 @@ export default function F1Manager() {
       .map(d => ({ driver: d, diff: d.ovr - (p.drivers.find(old => old.id === d.id)?.ovr || d.ovr) }))
       .sort((a, b) => b.diff - a.diff);
     const rosterValid = TEAMS.every(t => sanitizedRosterDrivers.filter(d => d.teamId === t.id).length === 2);
+    const lineupContinuity = TEAMS.map(t => {
+      const prev = previousLineups[t.id] || [];
+      const nextIds = sanitizedRosterDrivers.filter(d => d.teamId === t.id).map(d => d.id);
+      const overlap = nextIds.filter(id => prev.includes(id)).length;
+      return { teamId: t.id, overlap };
+    });
+    const unchangedLineups = lineupContinuity.filter(x => x.overlap === 2).length;
+    const changedLineups = TEAMS.length - unchangedLineups;
+    const avgContinuity = (lineupContinuity.reduce((sum, x) => sum + x.overlap, 0) / TEAMS.length).toFixed(2);
+    const newSeatSignings = TEAMS.flatMap(t => {
+      const prev = previousLineups[t.id] || [];
+      return sanitizedRosterDrivers.filter(d => d.teamId === t.id && !prev.includes(d.id));
+    });
+    const lowestNewSeatOvr = newSeatSignings.length ? Math.min(...newSeatSignings.map(d => d.ovr)) : null;
+    const reSigningsCount = transitionNews.filter(n => n.title.includes("Re-Sign")).length;
     if (devSwing[0]?.diff > 0) transitionNews.push(makeNews(`Development Movers: ${devSwing[0].team.name}`, `${devSwing[0].team.name} made the biggest winter jump (+${devSwing[0].diff}).`, "Development", 0));
     if (devSwing[devSwing.length - 1]?.diff < 0) transitionNews.push(makeNews(`Development Setback: ${devSwing[devSwing.length - 1].team.name}`, `${devSwing[devSwing.length - 1].team.name} suffered the sharpest decline (${devSwing[devSwing.length - 1].diff}).`, "Development", 0));
     if (driverSwing[0]?.diff > 0) transitionNews.push(makeNews(`Breakout Watch: ${driverSwing[0].driver.name}`, `${driverSwing[0].driver.name} posted the biggest offseason rise (+${driverSwing[0].diff} OVR).`, "Driver", 0));
     if (driverSwing[driverSwing.length - 1]?.diff < 0) transitionNews.push(makeNews(`Form Dip: ${driverSwing[driverSwing.length - 1].driver.name}`, `${driverSwing[driverSwing.length - 1].driver.name} had the sharpest offseason drop (${driverSwing[driverSwing.length - 1].diff} OVR).`, "Driver", 0));
     transitionNews.push(makeNews(`Roster Audit ${rosterValid ? "Passed" : "Failed"}`, `All teams ${rosterValid ? "have exactly" : "do not have"} two active race drivers before round one.`, "Team", 0));
     transitionNews.push(makeNews("Roster Validation Debug", `Invalid teams: ${rosterRevalidated.invalidTeams}. Emergency drivers generated: ${(postExpiryValidation.emergencyGenerated || 0) + (rosterFixed.emergencyGenerated || 0) + (rosterRevalidated.emergencyGenerated || 0)}.`, "Team", 0));
+    transitionNews.push(makeNews("Lineup Continuity Debug", `Re-signings: ${reSigningsCount}. Unchanged teams: ${unchangedLineups}/${TEAMS.length}. Changed teams: ${changedLineups}. Avg retained drivers/team: ${avgContinuity}. Lowest new-seat OVR: ${lowestNewSeatOvr ?? "—"}.`, "Team", 0));
     const oldestActive = [...sanitizedRosterDrivers].sort((a, b) => b.age - a.age).slice(0, 3).map(d => `${d.name} (${d.age})`).join(", ");
     transitionNews.push(makeNews("Oldest Active Drivers", oldestActive || "No active drivers found after offseason processing.", "Driver", 0));
     transitionNews.push(makeNews(`New Talent Class Arrives`, `${freshProspects.length} new prospects enter the market this season.`, "Driver", 0));
@@ -650,6 +667,21 @@ export default function F1Manager() {
       const next = runOffseason(sim);
       const finalRosterCheck = ensureValidTeamRosters(next.drivers, next.prospects, next.season, []);
       const safeNext = { ...next, drivers: finalRosterCheck.drivers, prospects: finalRosterCheck.prospects };
+      const prevLineups = Object.fromEntries(TEAMS.map(t => [t.id, sim.drivers.filter(d => d.teamId === t.id).map(d => d.id)]));
+      const continuityRows = TEAMS.map(t => {
+        const prev = prevLineups[t.id] || [];
+        const now = safeNext.drivers.filter(d => d.teamId === t.id).map(d => d.id);
+        const overlap = now.filter(id => prev.includes(id)).length;
+        return { teamId: t.id, overlap };
+      });
+      const unchangedTeams = continuityRows.filter(r => r.overlap === 2).length;
+      const avgContinuity = (continuityRows.reduce((s, r) => s + r.overlap, 0) / TEAMS.length).toFixed(2);
+      const offseasonReSignings = safeNext.news.filter(n => n.round === 0 && n.title.includes("Re-Sign")).length;
+      const newlySignedRaceDrivers = TEAMS.flatMap(t => {
+        const prev = prevLineups[t.id] || [];
+        return safeNext.drivers.filter(d => d.teamId === t.id && !prev.includes(d.id));
+      });
+      const lowestNewSeatOvr = newlySignedRaceDrivers.length ? Math.min(...newlySignedRaceDrivers.map(d => d.ovr)) : null;
       const nameCounts = {};
       safeNext.drivers.filter(d => d.teamId !== null).forEach(d => { nameCounts[d.name] = (nameCounts[d.name] || 0) + 1; });
       const duplicateNames = Object.entries(nameCounts).filter(([, c]) => c > 1).map(([name]) => name);
@@ -706,7 +738,7 @@ export default function F1Manager() {
         .map(row => `${row.team?.name} (car P${row.carRank}, drivers P${row.driverRank})`);
       const summary = makeNews(
         "Dev Sim Summary",
-        `WDC: ${topD?.driver?.name || "—"}. WCC: ${topC?.team?.name || "—"}. Gaps P1-P2/P2-P4: ${p1p2Gap}/${p2p4Gap}. Team buckets 0/1-10/11-50/50+: ${zeroPointTeams.length}/${lowPointsTeams}/${midPointsTeams}/${highPointsTeams}. Lower-half points finishers/race: ${avgLowerHalfPointFinishes}. Roster invalid teams/emergencies: ${finalRosterCheck.invalidTeams}/${finalRosterCheck.emergencyGenerated}. Duplicates: ${duplicateNames.length ? duplicateNames.join(", ") : "none"}. Active <80: ${activeBelow80}. Active OVR80+/85+: ${activeOver80}/${activeOver85}. Active buckets 80-82/83-85/86+: ${bucket8082}/${bucket8385}/${bucket86plus}. Avg grid OVR: ${avgGridOvr}. Lowest starter: ${lowestStarter ? `${lowestStarter.name} ${lowestStarter.ovr}` : "—"}. Top U22 prospects: ${topYoungProspects.length ? topYoungProspects.join(", ") : "none"}. Top10 OVR: ${top10Ratings.map(d => `${d.name.split(" ").pop()} ${d.ovr}`).join(", ")}. OVR90+/92+/95+: ${over90}/${over92}/${over95}. OVR80+: ${over80.length}. Top-car team avg OVR: ${topTeamDriverAvg}. Car-driver mismatch: ${mismatchTeams.length ? mismatchTeams.join(", ") : "none"}. Car range: ${sortedCars[sortedCars.length - 1]?.rating ?? "—"}-${sortedCars[0]?.rating ?? "—"}. Zero-point teams: ${zeroPointTeams.length ? zeroPointTeams.join(", ") : "none"}. Constructors: ${constructorOrder}.`,
+        `WDC: ${topD?.driver?.name || "—"}. WCC: ${topC?.team?.name || "—"}. Gaps P1-P2/P2-P4: ${p1p2Gap}/${p2p4Gap}. Team buckets 0/1-10/11-50/50+: ${zeroPointTeams.length}/${lowPointsTeams}/${midPointsTeams}/${highPointsTeams}. Lower-half points finishers/race: ${avgLowerHalfPointFinishes}. Roster invalid teams/emergencies: ${finalRosterCheck.invalidTeams}/${finalRosterCheck.emergencyGenerated}. Re-signings: ${offseasonReSignings}. Unchanged lineups: ${unchangedTeams}/${TEAMS.length}. Avg continuity: ${avgContinuity}. Lowest new-seat OVR: ${lowestNewSeatOvr ?? "—"}. Duplicates: ${duplicateNames.length ? duplicateNames.join(", ") : "none"}. Active <80: ${activeBelow80}. Active OVR80+/85+: ${activeOver80}/${activeOver85}. Active buckets 80-82/83-85/86+: ${bucket8082}/${bucket8385}/${bucket86plus}. Avg grid OVR: ${avgGridOvr}. Lowest starter: ${lowestStarter ? `${lowestStarter.name} ${lowestStarter.ovr}` : "—"}. Top U22 prospects: ${topYoungProspects.length ? topYoungProspects.join(", ") : "none"}. Top10 OVR: ${top10Ratings.map(d => `${d.name.split(" ").pop()} ${d.ovr}`).join(", ")}. OVR90+/92+/95+: ${over90}/${over92}/${over95}. OVR80+: ${over80.length}. Top-car team avg OVR: ${topTeamDriverAvg}. Car-driver mismatch: ${mismatchTeams.length ? mismatchTeams.join(", ") : "none"}. Car range: ${sortedCars[sortedCars.length - 1]?.rating ?? "—"}-${sortedCars[0]?.rating ?? "—"}. Zero-point teams: ${zeroPointTeams.length ? zeroPointTeams.join(", ") : "none"}. Constructors: ${constructorOrder}.`,
         "Team",
         0
       );

@@ -373,13 +373,28 @@ function aiTransfers(drivers, prospects, teamId, newSeason, transitionNews, driv
     expiringDrivers.forEach(d => {
       if (lineup.length >= 2) return;
       const value = driverValue(d);
-      const lowSeatRisk = d.ovr < 80 ? (d.lowOvrSeasons || 0) >= 2 ? 0.06 : 0.22 : 1;
-      const shouldResign = (value >= threshold && maybe(lowSeatRisk)) || (d.ovr >= 90 && maybe(0.92)) || (d.ovr >= 86 && maybe(0.75));
+      const perfPts = driverPoints?.[d.id] || 0;
+      const decline = d._ovrDelta || 0;
+      const bestMarket = marketPool.length > 0 ? driverValue(marketPool[0]) : value;
+      const replacementGap = bestMarket - value;
+      const fitScore = d.ovr - (carNow >= 92 ? 84 : carNow >= 88 ? 81 : 78);
+      const continuityBonus = retained.some(r => r.id === d.id) ? 0.12 : 0;
+      let resignChance = 0.52 + continuityBonus;
+      if (value >= threshold) resignChance += 0.2;
+      if (perfPts >= 100) resignChance += 0.15;
+      else if (perfPts >= 50) resignChance += 0.08;
+      if (fitScore >= 2) resignChance += 0.08;
+      if (replacementGap > 6) resignChance -= 0.2;
+      if (d.ovr < 80) resignChance -= (d.lowOvrSeasons || 0) >= 2 ? 0.45 : 0.22;
+      if (decline <= -2) resignChance -= 0.12;
+      if (carNow >= 90 && d.ovr < 82) resignChance -= 0.2;
+      resignChance = Math.max(0.05, Math.min(0.95, resignChance));
+      const shouldResign = maybe(resignChance) || value >= threshold + 7;
       if (shouldResign) {
         const idx = updatedDrivers.findIndex(x => x.id === d.id);
         if (idx >= 0) {
-          const years = d.ovr >= 90 ? 3 : d.ovr >= 82 ? 2 : 1;
-          updatedDrivers[idx] = { ...updatedDrivers[idx], ovr: Math.max(80, updatedDrivers[idx].ovr), lowOvrSeasons: 0, teamId: t.id, contractEnd: newSeason + years };
+          const years = d.ovr >= 88 ? 3 : d.ovr >= 82 ? 2 : 1;
+          updatedDrivers[idx] = { ...updatedDrivers[idx], lowOvrSeasons: d.ovr < 80 ? (d.lowOvrSeasons || 0) + 1 : 0, teamId: t.id, contractEnd: newSeason + years };
           lineup.push(updatedDrivers[idx]);
           transitionNews.push(makeNews(
             `${t.name} Re-Sign ${d.name}`,
@@ -403,13 +418,15 @@ function aiTransfers(drivers, prospects, teamId, newSeason, transitionNews, driv
       const teamIdn = TEAM_IDENTITIES?.[t.id] || { talent: 0.5 };
       const prospectScore = bestProspect ? (bestProspect.ovr + (bestProspect.pot || bestProspect.ovr) * (0.2 + teamIdn.talent * 0.1)) : -999;
 
-      const pickFA = bestFA && (faScore >= prospectScore + (carNow >= 88 ? 0 : 2) || !bestProspect || strength >= 86 || carNow >= 90);
+      const prospectReadiness = bestProspect ? (bestProspect.ovr + (bestProspect.pace || 3) * 0.8 + (bestProspect.consistency || 3) * 0.5) : -999;
+      const minProspectOvr = carNow >= 92 ? 83 : carNow >= 88 ? 81 : carNow >= 82 ? 79 : 76;
+      const pickFA = bestFA && (faScore >= prospectScore + (carNow >= 88 ? 0 : 2) || !bestProspect || strength >= 86 || carNow >= 90 || (bestProspect && (bestProspect.ovr < minProspectOvr || prospectReadiness < 84)));
 
       if (pickFA) {
         const idx = updatedDrivers.findIndex(x => x.id === bestFA.id);
         if (idx >= 0) {
           const years = bestFA.ovr >= 90 ? 3 : bestFA.ovr >= 82 ? 2 : 1;
-          updatedDrivers[idx] = { ...updatedDrivers[idx], ovr: Math.max(80, updatedDrivers[idx].ovr), lowOvrSeasons: 0, teamId: t.id, contractEnd: newSeason + years };
+          updatedDrivers[idx] = { ...updatedDrivers[idx], lowOvrSeasons: bestFA.ovr < 80 ? 1 : 0, teamId: t.id, contractEnd: newSeason + years };
           lineup.push(updatedDrivers[idx]);
           transitionNews.push(makeNews(
             `${bestFA.name} Signs for ${t.name}`,
@@ -419,7 +436,7 @@ function aiTransfers(drivers, prospects, teamId, newSeason, transitionNews, driv
         }
       } else {
         const years = bestProspect.ovr >= 80 ? 2 : 1;
-        const newDriver = { ...bestProspect, ovr: Math.max(80, bestProspect.ovr), lowOvrSeasons: 0, teamId: t.id, contractEnd: newSeason + years };
+        const newDriver = { ...bestProspect, lowOvrSeasons: bestProspect.ovr < 80 ? 1 : 0, teamId: t.id, contractEnd: newSeason + years };
         updatedDrivers.push(newDriver);
         availableProspects = availableProspects.filter(x => x.id !== bestProspect.id);
         lineup.push(newDriver);
