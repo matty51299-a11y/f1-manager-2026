@@ -897,47 +897,16 @@ export default function F1Manager() {
 
   return (
     <div style={{ height: "100dvh", minHeight: "100vh", width: "100vw", overflow: "hidden", background: `radial-gradient(1200px 700px at 80% -20%, rgba(91,141,239,0.16), transparent 60%), radial-gradient(900px 500px at -10% 120%, rgba(192,132,252,0.12), transparent 62%), ${BG}`, color: TEXT, fontFamily: "'Courier New', monospace", display: "flex", fontSize: 13 }}>
-      <div style={{ width: 190, height: "100%", background: `linear-gradient(180deg, ${BG2}, #0F1727 48%, #101A2A)`, borderRight: `1px solid ${BORDER}`, boxShadow: "inset -1px 0 0 rgba(91,141,239,0.2)", display: "flex", flexDirection: "column", flexShrink: 0 }}>
-        <div style={{ padding: "18px 14px 20px", borderBottom: `1px solid ${BORDER}` }}>
-          <div style={{ fontSize: 11, letterSpacing: 4, color: BLUE, fontWeight: 700, marginBottom: 2 }}>PIT WALL</div>
-          <div style={{ fontSize: 10, color: DIM2 }}>{season} · R{Math.min(raceIndex + 1, RACES_2026.length)}/{RACES_2026.length}</div>
-        </div>
-        <div style={{ padding: "10px 0", flex: 1 }}>
-          {sidebarTabs.map(t => (
-            <button key={t.id} onClick={() => { setGame(p => ({ ...p, tab: t.id, unreadNews: t.id === "news" ? 0 : p.unreadNews })); }} style={{
-              display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "9px 14px",
-              border: "none", background: tab === t.id ? "linear-gradient(90deg, rgba(91,141,239,0.22), rgba(91,141,239,0.06))" : "transparent",
-              color: tab === t.id ? "#fff" : DIM,
-              borderLeft: tab === t.id ? `2px solid ${team.color}` : "2px solid transparent",
-              cursor: "pointer", fontSize: 10, fontFamily: "inherit", letterSpacing: 2,
-              textAlign: "left", fontWeight: tab === t.id ? 700 : 400, transition: "all 0.15s", position: "relative"
-            }}>
-              <span style={{ fontSize: 13 }}>{t.icon}</span> {t.label}
-              {t.badge > 0 && t.id !== tab && <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "#fff", color: "#C41E1E", fontSize: 8, fontWeight: 800, padding: "1px 5px", borderRadius: 8, minWidth: 14, textAlign: "center" }}>{t.badge}</span>}
-            </button>
-          ))}
-        </div>
-        {/* Active modifiers */}
-        {modifiers && modifiers.length > 0 && (
-          <div style={{ padding: "8px 14px", borderTop: `1px solid ${BORDER}`, fontSize: 9 }}>
-            <div style={{ color: DIM, letterSpacing: 2, marginBottom: 4 }}>ACTIVE EFFECTS</div>
-            {modifiers.slice(0, 4).map((m, i) => (
-              <div key={i} style={{ color: m.value > 0 ? "#4ADE80" : "#F87171", marginBottom: 2 }}>
-                {m.value > 0 ? "▲" : "▼"} {m.type === "teamBoost" ? `Team ${m.value > 0 ? "+" : ""}${m.value}` : `${m.stat} ${m.value > 0 ? "+" : ""}${m.value}`} · {m.duration}R
-              </div>
-            ))}
-          </div>
-        )}
-        <div style={{ padding: 14, borderTop: `1px solid ${BORDER}`, fontSize: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}><TeamBadge teamId={team.id} size={18} /><span style={{ color: TEXT, fontWeight: 700 }}>{team.name}</span></div>
-          <div style={{ color: DIM }}>Budget: <span style={{ color: "#E2B53A" }}>${budget}M</span></div>
-          <div style={{ color: DIM, marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}>Car: <div style={{ flex: 1, height: 4, background: "rgba(0,0,0,0.15)", borderRadius: 2, maxWidth: 50 }}><div style={{ width: `${(((teamCars?.[team.id] || 75) - 60) / 40) * 100}%`, height: "100%", background: (teamCars?.[team.id] || 75) >= 90 ? "#22C55E" : (teamCars?.[team.id] || 75) >= 80 ? "#E2B53A" : "#F97316", borderRadius: 2 }} /></div><span style={{ color: (teamCars?.[team.id] || 75) >= 90 ? "#22C55E" : (teamCars?.[team.id] || 75) >= 80 ? "#E2B53A" : "#F97316", fontWeight: 700 }}>{teamCars?.[team.id] || 75}</span></div>
-        </div>
-      </div>
-
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0, position: "relative" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 22px", borderBottom: `1px solid ${BORDER}`, background: "linear-gradient(90deg, #070b18, #13233f)", boxShadow: "0 10px 24px rgba(0,0,0,0.3), 0 0 14px rgba(79,140,255,0.2)", flexWrap: "wrap", gap: 14 }}>
-          <div style={{ display: "flex", gap: 28, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 28, alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <TeamBadge teamId={team.id} size={18} />
+              <span style={{ color: TEXT, fontWeight: 800, letterSpacing: 1.5 }}>{team.name}</span>
+            </div>
+            <span style={{ fontSize: 10, color: DIM2, letterSpacing: 1.5 }}>Season {season} · Round {Math.min(raceIndex + 1, RACES_2026.length)}/{RACES_2026.length}</span>
+            <span style={{ fontSize: 10, color: DIM2 }}>Budget <span style={{ color: "#E2B53A", fontWeight: 700 }}>${budget}M</span></span>
+            <span style={{ fontSize: 10, color: DIM2 }}>Car <span style={{ color: (teamCars?.[team.id] || 75) >= 90 ? "#22C55E" : (teamCars?.[team.id] || 75) >= 80 ? "#E2B53A" : "#F97316", fontWeight: 700 }}>{teamCars?.[team.id] || 75}</span></span>
             <TS label="WCC" value={myCP} sub={cRank ? `P${cRank}` : "—"} color={team.color} />
             <TS label={myD1?.name?.split(" ").pop() || "—"} value={myD1 ? (driverPoints[myD1.id] || 0) : "—"} sub={d1Rank ? `P${d1Rank}` : ""} />
             <TS label={myD2?.name?.split(" ").pop() || "—"} value={myD2 ? (driverPoints[myD2.id] || 0) : "—"} sub={d2Rank ? `P${d2Rank}` : ""} />
@@ -962,9 +931,9 @@ export default function F1Manager() {
           {tab === "calendar" && <CalendarTab {...{ raceIndex, raceResults, team, season }} />}
           {tab === "history" && <HistoryTab history={history} team={team} rivalry={rivalry} />}
         </div>
-        <div style={{ position: "absolute", left: "50%", bottom: 14, transform: "translateX(-50%)", background: "linear-gradient(135deg, rgba(10,16,30,0.92), rgba(20,34,58,0.92))", border: `1px solid ${BORDER2}`, boxShadow: "0 18px 34px rgba(0,0,0,0.45), 0 0 22px rgba(79,140,255,0.2)", borderRadius: 16, padding: "8px 10px", display: "flex", gap: 8, zIndex: 8 }}>
-          {sidebarTabs.slice(0, 8).map(t => (
-            <button key={`bottom-${t.id}`} onClick={() => setGame(p => ({ ...p, tab: t.id, unreadNews: t.id === "news" ? 0 : p.unreadNews }))} style={{ border: "none", background: tab === t.id ? "linear-gradient(135deg, rgba(79,140,255,0.35), rgba(79,215,255,0.22))" : "transparent", color: tab === t.id ? "#fff" : DIM, borderRadius: 10, padding: "8px 12px", cursor: "pointer", fontFamily: "inherit", fontSize: 10, letterSpacing: 1.5, fontWeight: tab === t.id ? 800 : 600 }}>
+        <div style={{ position: "absolute", left: "50%", bottom: 14, transform: "translateX(-50%)", background: "linear-gradient(135deg, rgba(10,16,30,0.95), rgba(20,34,58,0.95))", border: `1px solid ${BORDER2}`, boxShadow: "0 18px 34px rgba(0,0,0,0.5), 0 0 22px rgba(79,140,255,0.25)", borderRadius: 18, padding: "10px 12px", display: "flex", gap: 10, zIndex: 8 }}>
+          {sidebarTabs.map(t => (
+            <button key={`bottom-${t.id}`} onClick={() => setGame(p => ({ ...p, tab: t.id, unreadNews: t.id === "news" ? 0 : p.unreadNews }))} style={{ border: "none", background: tab === t.id ? "linear-gradient(135deg, rgba(79,140,255,0.42), rgba(79,215,255,0.28))" : "rgba(255,255,255,0.02)", color: tab === t.id ? "#fff" : DIM, borderRadius: 11, padding: "9px 13px", cursor: "pointer", fontFamily: "inherit", fontSize: 10, letterSpacing: 1.4, fontWeight: tab === t.id ? 800 : 600, boxShadow: tab === t.id ? "0 6px 14px rgba(79,140,255,0.3)" : "none", transition: "all 0.2s ease" }}>
               {t.icon} {t.label}
             </button>
           ))}
