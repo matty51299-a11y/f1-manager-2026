@@ -66,6 +66,12 @@ You run an F1 team across multiple seasons: hire drivers, manage contracts/budge
 - Update this file at the end of each dev session.
 
 ## Change Log
+### v0.1.8
+- Added explicit transfer renewal accounting (expiring, eligible, attempts, accepted renewals, replacement choices) for offseason diagnostics.
+- Strengthened weak-incumbent replacement pressure while preserving continuity-friendly renewal behavior.
+- Increased lower-field points-access variability and attrition tuning to reduce persistent zero-point seasons.
+- Tightened retirement curve to avoid unrealistic retirements around age 30–31.
+
 ### v0.1.7
 - Added large startup talent-pool expansion (~100 total drivers) with explicit F1-ready depth bands to stabilize early-season AI signings.
 - Rebalanced retirement safeguards to prevent unrealistic young retirements except extreme edge cases.

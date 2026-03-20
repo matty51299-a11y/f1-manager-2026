@@ -182,13 +182,13 @@ function ensureValidTeamRosters(drivers, prospects, newSeason, transitionNews = 
 }
 
 function retirementChanceForDriver(driver, perfPts, hasSeat) {
-  if (driver.age < 28) {
-    if (!hasSeat && driver.ovr <= 68 && (driver.lowOvrSeasons || 0) >= 2) return 0.12;
+  if (driver.age < 34) {
+    if (!hasSeat && driver.ovr < 75) {
+      if (driver.age <= 29) return 0.01;
+      if (driver.age <= 31) return 0.025;
+      return 0.04;
+    }
     return 0;
-  }
-  if (driver.age < 30) {
-    if (!hasSeat && driver.ovr <= 70) return 0.04;
-    return 0.005;
   }
   if (driver.age >= 47) return 0.995;
 
@@ -196,16 +196,16 @@ function retirementChanceForDriver(driver, perfPts, hasSeat) {
   const eliteLongevity = driver.ovr >= 90 && perfPts >= 90;
   let chance = 0;
 
-  if (driver.age <= 34) chance = 0;
-  else if (driver.age <= 36) chance = 0.01;
-  else if (driver.age === 37) chance = 0.04;
-  else if (driver.age === 38) chance = 0.09;
-  else if (driver.age === 39) chance = 0.18;
-  else if (driver.age === 40) chance = 0.34;
-  else if (driver.age === 41) chance = 0.52;
-  else if (driver.age === 42) chance = 0.68;
-  else if (driver.age === 43) chance = 0.8;
-  else if (driver.age === 44) chance = 0.9;
+  if (driver.age <= 35) chance = 0.08;
+  else if (driver.age === 36) chance = 0.16;
+  else if (driver.age === 37) chance = 0.28;
+  else if (driver.age === 38) chance = 0.44;
+  else if (driver.age === 39) chance = 0.56;
+  else if (driver.age === 40) chance = 0.68;
+  else if (driver.age === 41) chance = 0.78;
+  else if (driver.age === 42) chance = 0.85;
+  else if (driver.age === 43) chance = 0.9;
+  else if (driver.age === 44) chance = 0.94;
   else if (driver.age === 45) chance = 0.96;
   else chance = 0.985;
 
@@ -218,8 +218,9 @@ function retirementChanceForDriver(driver, perfPts, hasSeat) {
   if (!hasSeat) chance += 0.15;
   if (!hasSeat && driver.age >= 38) chance += 0.08;
 
-  if (eliteLongevity) chance -= 0.12;
-  if (driver.ovr >= 93 && perfPts >= 140) chance -= 0.06;
+  if (eliteLongevity) chance -= 0.14;
+  if (driver.ovr >= 88) chance -= 0.07;
+  if (driver.ovr >= 93 && perfPts >= 140) chance -= 0.08;
   if (driver.age >= 43 && eliteLongevity) chance = Math.max(chance, 0.2); // very rare late-career holdouts
 
   return Math.max(0, Math.min(0.997, chance));
@@ -427,6 +428,7 @@ export default function F1Manager() {
       else if (newAge <= 25 && pot >= 88) ovrChange += maybe(0.22) ? 1 : 0;
       if (pot - d.ovr <= 2 && newAge <= 25) ovrChange += maybe(0.3) ? -1 : 0;
       if (d.ovr >= 94) ovrChange += pick([-3, -2, -2, -1, 0]);
+      if (d.ovr >= 94 && newAge >= 27 && maybe(0.35)) ovrChange -= 1;
       else if (d.ovr >= 92) ovrChange += pick([-2, -1, -1, 0, 0, 1]);
       else if (d.ovr >= 90) ovrChange += pick([-1, -1, 0, 0, 1]);
       else if (d.ovr >= 86 && newAge >= 29) ovrChange += pick([-1, -1, 0, 0, 1]);
@@ -537,6 +539,7 @@ export default function F1Manager() {
     const aiResult = aiTransfers(postExpiryValidation.drivers, postExpiryValidation.prospects, team.id, newSeason, transitionNews, p.driverPoints, p.constructorPoints, newTeamCars, expiringByTeam);
     const postAiDrivers = aiResult.drivers;
     const postAiProspects = aiResult.prospects;
+    const transferStats = aiResult.transferStats || { expiringContracts: 0, eligibleRenewals: 0, renewalAttempts: 0, acceptedRenewals: 0, replacementChoices: 0 };
     const rosterFixed = ensureValidTeamRosters(postAiDrivers, postAiProspects, newSeason, transitionNews);
 
     const finalDrivers = rosterFixed.drivers
@@ -553,13 +556,16 @@ export default function F1Manager() {
 
     transitionNews.push(makeNews(`${newSeason} Season Begins`, `A new year dawns for ${team.name}. Base budget $${baseBudget}M + prize money $${prizeMoney}M from P${cPos}.`, "Team", 0));
     if (retiredDrivers.length > 0) {
-      const youngRetirements = retiredDrivers.filter(d => d.age < 30).length;
+      const under30 = retiredDrivers.filter(d => d.age < 30).length;
+      const band3033 = retiredDrivers.filter(d => d.age >= 30 && d.age <= 33).length;
+      const band3436 = retiredDrivers.filter(d => d.age >= 34 && d.age <= 36).length;
+      const band37plus = retiredDrivers.filter(d => d.age >= 37).length;
       const headlineRetirees = retiredDrivers
         .sort((a, b) => (b._ovrDelta || 0) - (a._ovrDelta || 0))
         .slice(0, 3)
         .map(d => `${d.name} (${d.age})`)
         .join(", ");
-      transitionNews.push(makeNews("Retirements Confirmed", `${retiredDrivers.length} driver(s) retired this offseason: ${headlineRetirees}. Young retirements (<30): ${youngRetirements}.`, "Driver", 0));
+      transitionNews.push(makeNews("Retirements Confirmed", `${retiredDrivers.length} driver(s) retired this offseason: ${headlineRetirees}. Age bands U30/30-33/34-36/37+: ${under30}/${band3033}/${band3436}/${band37plus}.`, "Driver", 0));
     }
     releasedDrivers.forEach(rd => transitionNews.push(makeNews(`${rd.name} Contract Expired`, `${rd.name}'s deal with ${team.name} has ended. The seat is now open.`, "Driver", 0)));
 
@@ -589,7 +595,7 @@ export default function F1Manager() {
     if (driverSwing[driverSwing.length - 1]?.diff < 0) transitionNews.push(makeNews(`Form Dip: ${driverSwing[driverSwing.length - 1].driver.name}`, `${driverSwing[driverSwing.length - 1].driver.name} had the sharpest offseason drop (${driverSwing[driverSwing.length - 1].diff} OVR).`, "Driver", 0));
     transitionNews.push(makeNews(`Roster Audit ${rosterValid ? "Passed" : "Failed"}`, `All teams ${rosterValid ? "have exactly" : "do not have"} two active race drivers before round one.`, "Team", 0));
     transitionNews.push(makeNews("Roster Validation Debug", `Invalid teams: ${rosterRevalidated.invalidTeams}. Emergency drivers generated: ${(postExpiryValidation.emergencyGenerated || 0) + (rosterFixed.emergencyGenerated || 0) + (rosterRevalidated.emergencyGenerated || 0)}.`, "Team", 0));
-    transitionNews.push(makeNews("Lineup Continuity Debug", `Re-signings: ${reSigningsCount}. Unchanged teams: ${unchangedLineups}/${TEAMS.length}. Changed teams: ${changedLineups}. Avg retained drivers/team: ${avgContinuity}. Lowest new-seat OVR: ${lowestNewSeatOvr ?? "—"}.`, "Team", 0));
+    transitionNews.push(makeNews("Lineup Continuity Debug", `Expiring: ${transferStats.expiringContracts}. Eligible: ${transferStats.eligibleRenewals}. Renewal attempts: ${transferStats.renewalAttempts}. Accepted renewals: ${transferStats.acceptedRenewals}. Replacement choices: ${transferStats.replacementChoices}. Re-signings: ${reSigningsCount}. Unchanged teams: ${unchangedLineups}/${TEAMS.length}. Changed teams: ${changedLineups}. Avg retained drivers/team: ${avgContinuity}. Lowest new-seat OVR: ${lowestNewSeatOvr ?? "—"}.`, "Team", 0));
     const oldestActive = [...sanitizedRosterDrivers].sort((a, b) => b.age - a.age).slice(0, 3).map(d => `${d.name} (${d.age})`).join(", ");
     transitionNews.push(makeNews("Oldest Active Drivers", oldestActive || "No active drivers found after offseason processing.", "Driver", 0));
     transitionNews.push(makeNews(`New Talent Class Arrives`, `${freshProspects.length} new prospects enter the market this season.`, "Driver", 0));
