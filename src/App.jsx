@@ -537,11 +537,19 @@ export default function F1Manager() {
     });
 
     const transitionNews = [];
-    const postExpiryValidation = ensureValidTeamRosters(processedDrivers, allProspects, newSeason, transitionNews);
-    const aiResult = aiTransfers(postExpiryValidation.drivers, postExpiryValidation.prospects, team.id, newSeason, transitionNews, p.driverPoints, p.constructorPoints, newTeamCars, expiringByTeam);
+    // Critical flow: attempt contract renewals before any roster backfill/validation fill logic.
+    const aiResult = aiTransfers(processedDrivers, allProspects, team.id, newSeason, transitionNews, p.driverPoints, p.constructorPoints, newTeamCars, expiringByTeam);
     const postAiDrivers = aiResult.drivers;
     const postAiProspects = aiResult.prospects;
-    const transferStats = aiResult.transferStats || { expiringContracts: 0, eligibleRenewals: 0, renewalAttempts: 0, acceptedRenewals: 0, replacementChoices: 0 };
+    const transferStats = aiResult.transferStats || {
+      expiringContracts: 0,
+      eligibleRenewals: 0,
+      renewalAttempts: 0,
+      acceptedRenewals: 0,
+      skippedRenewals: 0,
+      skippedRenewalReasons: {},
+      replacementChoices: 0,
+    };
     const rosterFixed = ensureValidTeamRosters(postAiDrivers, postAiProspects, newSeason, transitionNews);
 
     const finalDrivers = rosterFixed.drivers
@@ -591,16 +599,20 @@ export default function F1Manager() {
     });
     const lowestNewSeatOvr = newSeatSignings.length ? Math.min(...newSeatSignings.map(d => d.ovr)) : null;
     const reSigningsCount = transitionNews.filter(n => n.title.includes("Re-Sign")).length;
-    if (transferStats.expiringContracts > 0 && transferStats.renewalAttempts === 0) {
+    if (transferStats.eligibleRenewals > 0 && transferStats.renewalAttempts === 0) {
       transitionNews.push(makeNews("Renewal Attempt Error", `Expiring contracts detected (${transferStats.expiringContracts}) but renewal attempts were zero.`, "Board", 0));
     }
+    const skippedReasonSummary = Object.entries(transferStats.skippedRenewalReasons || {})
+      .sort((a, b) => b[1] - a[1])
+      .map(([reason, count]) => `${reason}: ${count}`)
+      .join(" | ") || "none";
     if (devSwing[0]?.diff > 0) transitionNews.push(makeNews(`Development Movers: ${devSwing[0].team.name}`, `${devSwing[0].team.name} made the biggest winter jump (+${devSwing[0].diff}).`, "Development", 0));
     if (devSwing[devSwing.length - 1]?.diff < 0) transitionNews.push(makeNews(`Development Setback: ${devSwing[devSwing.length - 1].team.name}`, `${devSwing[devSwing.length - 1].team.name} suffered the sharpest decline (${devSwing[devSwing.length - 1].diff}).`, "Development", 0));
     if (driverSwing[0]?.diff > 0) transitionNews.push(makeNews(`Breakout Watch: ${driverSwing[0].driver.name}`, `${driverSwing[0].driver.name} posted the biggest offseason rise (+${driverSwing[0].diff} OVR).`, "Driver", 0));
     if (driverSwing[driverSwing.length - 1]?.diff < 0) transitionNews.push(makeNews(`Form Dip: ${driverSwing[driverSwing.length - 1].driver.name}`, `${driverSwing[driverSwing.length - 1].driver.name} had the sharpest offseason drop (${driverSwing[driverSwing.length - 1].diff} OVR).`, "Driver", 0));
     transitionNews.push(makeNews(`Roster Audit ${rosterValid ? "Passed" : "Failed"}`, `All teams ${rosterValid ? "have exactly" : "do not have"} two active race drivers before round one.`, "Team", 0));
-    transitionNews.push(makeNews("Roster Validation Debug", `Invalid teams: ${rosterRevalidated.invalidTeams}. Emergency drivers generated: ${(postExpiryValidation.emergencyGenerated || 0) + (rosterFixed.emergencyGenerated || 0) + (rosterRevalidated.emergencyGenerated || 0)}.`, "Team", 0));
-    transitionNews.push(makeNews("Lineup Continuity Debug", `Expiring: ${transferStats.expiringContracts}. Eligible: ${transferStats.eligibleRenewals}. Renewal attempts: ${transferStats.renewalAttempts}. Accepted renewals: ${transferStats.acceptedRenewals}. Replacement choices: ${transferStats.replacementChoices}. Re-signings: ${reSigningsCount}. Unchanged teams: ${unchangedLineups}/${TEAMS.length}. Changed teams: ${changedLineups}. Avg retained drivers/team: ${avgContinuity}. Lowest new-seat OVR: ${lowestNewSeatOvr ?? "—"}.`, "Team", 0));
+    transitionNews.push(makeNews("Roster Validation Debug", `Invalid teams: ${rosterRevalidated.invalidTeams}. Emergency drivers generated: ${(rosterFixed.emergencyGenerated || 0) + (rosterRevalidated.emergencyGenerated || 0)}.`, "Team", 0));
+    transitionNews.push(makeNews("Lineup Continuity Debug", `Expiring: ${transferStats.expiringContracts}. Eligible: ${transferStats.eligibleRenewals}. Renewal attempts: ${transferStats.renewalAttempts}. Accepted renewals: ${transferStats.acceptedRenewals}. Skipped renewals: ${transferStats.skippedRenewals || 0}. Skipped reasons: ${skippedReasonSummary}. Replacement choices: ${transferStats.replacementChoices}. Re-signings: ${reSigningsCount}. Unchanged teams: ${unchangedLineups}/${TEAMS.length}. Changed teams: ${changedLineups}. Avg retained drivers/team: ${avgContinuity}. Lowest new-seat OVR: ${lowestNewSeatOvr ?? "—"}.`, "Team", 0));
     const oldestActive = [...sanitizedRosterDrivers].sort((a, b) => b.age - a.age).slice(0, 3).map(d => `${d.name} (${d.age})`).join(", ");
     transitionNews.push(makeNews("Oldest Active Drivers", oldestActive || "No active drivers found after offseason processing.", "Driver", 0));
     transitionNews.push(makeNews(`New Talent Class Arrives`, `${freshProspects.length} new prospects enter the market this season.`, "Driver", 0));
