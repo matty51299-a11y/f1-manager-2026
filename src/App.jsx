@@ -33,6 +33,54 @@ function TS({ label, value, sub, color }) { return (<div><div style={{ fontSize:
 function DashCard({ title, children, accent }) {
   return <div style={{ background: BG3, border: `1px solid ${accent ? accent + "55" : BORDER}`, padding: "12px 14px", minHeight: 88 }}><div style={{ fontSize: 8, color: accent || DIM, letterSpacing: 2, marginBottom: 6, fontWeight: 700 }}>{title}</div><div style={{ fontSize: 11, color: TEXT2, lineHeight: 1.5 }}>{children}</div></div>;
 }
+function DriverLink({ driver, onOpen, color = TEXT, weight = 700 }) {
+  if (!driver) return <span style={{ color }}>—</span>;
+  return (
+    <button onClick={() => onOpen?.(driver.id)} style={{ background: "transparent", border: "none", color, fontWeight: weight, cursor: "pointer", padding: 0, fontFamily: "inherit", textDecoration: "underline dotted", textUnderlineOffset: 2 }}>
+      {driver.name}
+    </button>
+  );
+}
+function DriverHistoryModal({ driver, season, driverPoints, driverSeasonStats, driverCareer, onClose }) {
+  if (!driver) return null;
+  const currentTeam = TEAMS.find(t => t.id === driver.teamId);
+  const currentSeason = driverSeasonStats?.[driver.id] || blankSeasonStats();
+  const historical = [...(driverCareer?.[driver.id]?.seasons || [])].reverse();
+  const rows = historical.length > 0
+    ? historical
+    : [{ season, points: driverPoints?.[driver.id] || currentSeason.points, wins: currentSeason.wins, podiums: currentSeason.podiums, poles: currentSeason.poles, position: null, teamName: currentTeam?.name || "Free Agent", ovr: driver.ovr }];
+  const yearsRemaining = driver.contractEnd ? Math.max(0, driver.contractEnd - season) : 0;
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={onClose}>
+      <div style={{ width: "min(940px, 96vw)", maxHeight: "90vh", overflow: "auto", background: BG2, border: `1px solid ${BORDER2}`, padding: 18 }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+          <div>
+            <div style={{ fontSize: 24, color: "#fff", fontWeight: 900, fontFamily: "'Arial Black', sans-serif" }}>{driver.name}</div>
+            <div style={{ fontSize: 11, color: DIM }}>Team: {currentTeam?.name || "Free Agent"} · Age {driver.age} · OVR {driver.ovr} · POT {driver.pot || "—"} · Contract years left {yearsRemaining}</div>
+          </div>
+          <button onClick={onClose} style={{ background: "transparent", border: `1px solid ${BORDER}`, color: TEXT2, cursor: "pointer", padding: "4px 10px", fontFamily: "inherit" }}>Close</button>
+        </div>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead><tr style={{ borderBottom: `1px solid ${BORDER2}` }}>{["SEASON", "TEAM", "OVR", "PTS", "W", "POD", "POLE", "FIN POS"].map(h => <th key={h} style={{ textAlign: "left", padding: "7px 8px", fontSize: 8, letterSpacing: 2, color: DIM }}>{h}</th>)}</tr></thead>
+          <tbody>
+            {rows.map((row, idx) => (
+              <tr key={idx} style={{ borderBottom: `1px solid ${BORDER}` }}>
+                <td style={{ padding: "8px", color: "#fff", fontWeight: 700 }}>{row.season}</td>
+                <td style={{ padding: "8px", color: TEXT2 }}>{row.teamName || "Free Agent"}</td>
+                <td style={{ padding: "8px", color: "#E2B53A" }}>{row.ovr ?? "—"}</td>
+                <td style={{ padding: "8px", color: "#E2B53A", fontWeight: 700 }}>{row.points ?? 0}</td>
+                <td style={{ padding: "8px", color: "#4ADE80" }}>{row.wins ?? 0}</td>
+                <td style={{ padding: "8px", color: BLUE }}>{row.podiums ?? 0}</td>
+                <td style={{ padding: "8px", color: "#C084FC" }}>{row.poles ?? 0}</td>
+                <td style={{ padding: "8px", color: TEXT2 }}>{row.position ? `P${row.position}` : "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 const blankSeasonStats = () => ({ points: 0, wins: 0, podiums: 0, poles: 0, races: 0, finishes: 0, sumFinish: 0, dnfs: 0 });
 const avgFinish = (st) => (st.finishes > 0 ? (st.sumFinish / st.finishes).toFixed(2) : "—");
 const CAR_OVERALL_FLOOR = 70;
@@ -274,9 +322,14 @@ function updateProfileStats(prev, raceResult, driverPoints, constructorPoints, s
   }
 
   if (isLastRace) {
+    const driverPositions = Object.entries(driverPoints)
+      .sort((a, b) => (b[1] || 0) - (a[1] || 0))
+      .reduce((acc, [id], idx) => ({ ...acc, [id]: idx + 1 }), {});
     Object.entries(driverSeason).forEach(([id, stat]) => {
       const prevCareer = driverCareer[id] || { total: blankSeasonStats(), seasons: [] };
       const total = { ...prevCareer.total };
+      const driverObj = prev.drivers.find(d => d.id === parseInt(id));
+      const driverTeam = TEAMS.find(t => t.id === driverObj?.teamId);
       total.points += stat.points;
       total.wins += stat.wins;
       total.podiums += stat.podiums;
@@ -285,7 +338,14 @@ function updateProfileStats(prev, raceResult, driverPoints, constructorPoints, s
       total.finishes += stat.finishes;
       total.sumFinish += stat.sumFinish;
       total.dnfs += stat.dnfs;
-      const seasons = [...(prevCareer.seasons || []), { season, ...stat }];
+      const seasons = [...(prevCareer.seasons || []), {
+        season,
+        ...stat,
+        teamId: driverObj?.teamId ?? null,
+        teamName: driverTeam?.name || "Free Agent",
+        ovr: driverObj?.ovr ?? null,
+        position: driverPositions[id] || null,
+      }];
       driverCareer[id] = { total, seasons };
       driverSeason[id] = blankSeasonStats();
     });
@@ -306,6 +366,7 @@ function updateProfileStats(prev, raceResult, driverPoints, constructorPoints, s
 export default function F1Manager() {
   const [game, setGame] = useState(null);
   const [selectedTeam, setSelectedTeam] = useState(null);
+  const [driverCardId, setDriverCardId] = useState(null);
   const timerRef = useRef(null);
   useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current); }, []);
 
@@ -336,6 +397,7 @@ export default function F1Manager() {
   /* ── GAME LOGIC ── */
   const { team, drivers, prospects, budget, season, raceIndex, raceResults, driverPoints, constructorPoints, tab, weekendPhase, qualiResults, raceResult, qualiWeather, revealCount, raceRevealCount, news, modifiers, unreadNews, teamCars, teamCarProfiles, history, rivalry, driverSeasonStats, driverCareer, teamSeasonStats, teamHistory } = game;
   const myDrivers = drivers.filter(d => d.teamId === team.id);
+  const cardDriver = drivers.find(d => d.id === driverCardId);
   const currentRace = RACES_2026[raceIndex];
 
 
@@ -427,29 +489,34 @@ export default function F1Manager() {
       if (newAge <= 23 && pot >= 92) ovrChange += maybe(0.34) ? pick([2, 3]) : 0;
       else if (newAge <= 25 && pot >= 88) ovrChange += maybe(0.22) ? 1 : 0;
       if (pot - d.ovr <= 2 && newAge <= 25) ovrChange += maybe(0.3) ? -1 : 0;
-      if (d.ovr >= 94) ovrChange += pick([-3, -2, -2, -1, 0]);
-      if (d.ovr >= 94 && newAge >= 27 && maybe(0.35)) ovrChange -= 1;
-      else if (d.ovr >= 92) ovrChange += pick([-2, -1, -1, 0, 0, 1]);
-      else if (d.ovr >= 90) ovrChange += pick([-1, -1, 0, 0, 1]);
+      if (d.ovr >= 94) ovrChange += pick([-4, -3, -2, -2, -1, 0]);
+      if (d.ovr >= 94 && newAge >= 27 && maybe(0.45)) ovrChange -= 1;
+      else if (d.ovr >= 92) ovrChange += pick([-3, -2, -2, -1, -1, 0]);
+      else if (d.ovr >= 90) ovrChange += pick([-2, -2, -1, -1, 0, 0, 1]);
+      else if (d.ovr >= 88) ovrChange += pick([-2, -1, -1, 0, 0, 1]);
       else if (d.ovr >= 86 && newAge >= 29) ovrChange += pick([-1, -1, 0, 0, 1]);
-      if (d.ovr >= 88 && maybe(0.22)) ovrChange -= 1;
+      if (d.ovr >= 88 && maybe(0.35)) ovrChange -= 1;
       if (perfPts >= 220) ovrChange += 3;
       else if (perfPts >= 130) ovrChange += 2;
       else if (perfPts >= 60) ovrChange += 1;
       else if (perfPts <= 3 && newAge >= 30) ovrChange -= 2;
       else if (perfPts <= 10 && newAge >= 30) ovrChange -= 1;
       if (d.ovr >= 86 && perfPts < 70 && maybe(0.25)) ovrChange -= 1;
-      if (newAge >= 23 && newAge <= 31 && pot >= 84 && maybe(0.2)) ovrChange += 1;
-      if (d.ovr >= 80 && d.ovr <= 82 && perfPts >= 45 && maybe(0.25)) ovrChange += 1;
-      if (newAge <= 24 && pot >= 90 && maybe(0.22)) ovrChange += pick([2, 3]);
+      if (newAge >= 23 && newAge <= 31 && pot >= 84 && d.ovr <= 87 && maybe(0.16)) ovrChange += 1;
+      if (d.ovr >= 80 && d.ovr <= 82 && perfPts >= 45 && maybe(0.32)) ovrChange += 1;
+      if (d.ovr >= 83 && d.ovr <= 85 && perfPts >= 35 && maybe(0.22)) ovrChange += 1;
+      if (newAge <= 24 && pot >= 90 && d.ovr <= 87 && maybe(0.16)) ovrChange += pick([1, 2]);
       if (newAge >= 31 && maybe(0.2)) ovrChange -= pick([1, 2]);
       if (newAge >= 34 && maybe(0.3)) ovrChange -= pick([1, 2]);
       if (newAge >= 37 && maybe(0.35)) ovrChange -= pick([1, 2, 3]);
-      ovrChange = Math.max(-6, Math.min(6, ovrChange));
+      if (d.ovr >= 90) ovrChange = Math.min(ovrChange, 1);
+      if (d.ovr >= 92) ovrChange = Math.min(ovrChange, 0);
+      ovrChange = Math.max(-6, Math.min(5, ovrChange));
       const legacyLongevity = d.ovr >= 93 && perfPts >= 180 && maybe(0.08);
-      const maxAllowed = (newAge <= 24 ? 96 : newAge <= 28 ? 95 : newAge <= 31 ? 94 : newAge <= 34 ? 92 : 90) + (legacyLongevity ? 1 : 0);
+      const maxAllowed = (newAge <= 24 ? 95 : newAge <= 28 ? 94 : newAge <= 31 ? 93 : newAge <= 34 ? 91 : 89) + (legacyLongevity ? 1 : 0);
       let newOvr = Math.max(55, Math.min(maxAllowed, d.ovr + ovrChange));
-      if (newOvr > 90 && newAge > 24 && maybe(0.28)) newOvr -= 1;
+      if (newOvr > 90 && newAge > 24 && maybe(0.4)) newOvr -= 1;
+      if (newOvr >= 89 && maybe(0.22)) newOvr -= 1;
       const newPot = Math.max(newOvr + 1, Math.min(99, pot + (newAge <= 22 && maybe(0.3) ? 1 : 0) - (newAge >= 31 ? 1 : 0)));
       const lowOvrSeasons = d.teamId !== null ? (newOvr < 80 ? (d.lowOvrSeasons || 0) + 1 : 0) : 0;
       return { ...d, age: newAge, ovr: newOvr, pot: newPot, _ovrDelta: ovrChange, lowOvrSeasons };
@@ -511,8 +578,8 @@ export default function F1Manager() {
       const oldProfile = prevProfiles[t.id] || { aero: t.car, power: t.car, grip: t.car - 1, tyreWear: t.car - 2, reliability: t.car - 1, overall: t.car };
       const tCPos = cStandings.findIndex(s => s.team?.id === t.id) + 1;
       const finishBonus = tCPos > 0 ? (12 - tCPos) * 0.12 : 0;
-      const catchup = (80 - oldProfile.overall) * 0.08 + (oldProfile.overall < 76 ? 0.7 : oldProfile.overall < 80 ? 0.35 : 0);
-      const elitePenalty = oldProfile.overall >= 94 ? 2.5 : oldProfile.overall >= 92 ? 2.0 : oldProfile.overall >= 88 ? 1.2 : oldProfile.overall >= 84 ? 0.5 : 0;
+      const catchup = (81 - oldProfile.overall) * 0.1 + (oldProfile.overall < 76 ? 1.0 : oldProfile.overall < 80 ? 0.55 : 0);
+      const elitePenalty = oldProfile.overall >= 94 ? 2.8 : oldProfile.overall >= 92 ? 2.25 : oldProfile.overall >= 88 ? 1.35 : oldProfile.overall >= 84 ? 0.55 : 0;
       const eliteStallRisk = oldProfile.overall >= 92 ? 0.22 : oldProfile.overall >= 89 ? 0.12 : 0.04;
       const conceptRoll = Math.random();
       const conceptDelta = conceptRoll < (0.18 + eliteStallRisk)
@@ -537,11 +604,19 @@ export default function F1Manager() {
     });
 
     const transitionNews = [];
-    const postExpiryValidation = ensureValidTeamRosters(processedDrivers, allProspects, newSeason, transitionNews);
-    const aiResult = aiTransfers(postExpiryValidation.drivers, postExpiryValidation.prospects, team.id, newSeason, transitionNews, p.driverPoints, p.constructorPoints, newTeamCars, expiringByTeam);
+    // Critical flow: attempt contract renewals before any roster backfill/validation fill logic.
+    const aiResult = aiTransfers(processedDrivers, allProspects, team.id, newSeason, transitionNews, p.driverPoints, p.constructorPoints, newTeamCars, expiringByTeam);
     const postAiDrivers = aiResult.drivers;
     const postAiProspects = aiResult.prospects;
-    const transferStats = aiResult.transferStats || { expiringContracts: 0, eligibleRenewals: 0, renewalAttempts: 0, acceptedRenewals: 0, replacementChoices: 0 };
+    const transferStats = aiResult.transferStats || {
+      expiringContracts: 0,
+      eligibleRenewals: 0,
+      renewalAttempts: 0,
+      acceptedRenewals: 0,
+      skippedRenewals: 0,
+      skippedRenewalReasons: {},
+      replacementChoices: 0,
+    };
     const rosterFixed = ensureValidTeamRosters(postAiDrivers, postAiProspects, newSeason, transitionNews);
 
     const finalDrivers = rosterFixed.drivers
@@ -590,17 +665,24 @@ export default function F1Manager() {
       return sanitizedRosterDrivers.filter(d => d.teamId === t.id && !prev.includes(d.id));
     });
     const lowestNewSeatOvr = newSeatSignings.length ? Math.min(...newSeatSignings.map(d => d.ovr)) : null;
+    const activeGrid = sanitizedRosterDrivers.filter(d => d.teamId !== null);
+    const avgGridOvr = activeGrid.length ? (activeGrid.reduce((sum, d) => sum + d.ovr, 0) / activeGrid.length) : 0;
+    const inflationWarning = avgGridOvr > 85.8 ? `Inflation warning: avg grid OVR ${avgGridOvr.toFixed(1)} above healthy range.` : "Inflation warning: none.";
     const reSigningsCount = transitionNews.filter(n => n.title.includes("Re-Sign")).length;
-    if (transferStats.expiringContracts > 0 && transferStats.renewalAttempts === 0) {
+    if (transferStats.eligibleRenewals > 0 && transferStats.renewalAttempts === 0) {
       transitionNews.push(makeNews("Renewal Attempt Error", `Expiring contracts detected (${transferStats.expiringContracts}) but renewal attempts were zero.`, "Board", 0));
     }
+    const skippedReasonSummary = Object.entries(transferStats.skippedRenewalReasons || {})
+      .sort((a, b) => b[1] - a[1])
+      .map(([reason, count]) => `${reason}: ${count}`)
+      .join(" | ") || "none";
     if (devSwing[0]?.diff > 0) transitionNews.push(makeNews(`Development Movers: ${devSwing[0].team.name}`, `${devSwing[0].team.name} made the biggest winter jump (+${devSwing[0].diff}).`, "Development", 0));
     if (devSwing[devSwing.length - 1]?.diff < 0) transitionNews.push(makeNews(`Development Setback: ${devSwing[devSwing.length - 1].team.name}`, `${devSwing[devSwing.length - 1].team.name} suffered the sharpest decline (${devSwing[devSwing.length - 1].diff}).`, "Development", 0));
     if (driverSwing[0]?.diff > 0) transitionNews.push(makeNews(`Breakout Watch: ${driverSwing[0].driver.name}`, `${driverSwing[0].driver.name} posted the biggest offseason rise (+${driverSwing[0].diff} OVR).`, "Driver", 0));
     if (driverSwing[driverSwing.length - 1]?.diff < 0) transitionNews.push(makeNews(`Form Dip: ${driverSwing[driverSwing.length - 1].driver.name}`, `${driverSwing[driverSwing.length - 1].driver.name} had the sharpest offseason drop (${driverSwing[driverSwing.length - 1].diff} OVR).`, "Driver", 0));
     transitionNews.push(makeNews(`Roster Audit ${rosterValid ? "Passed" : "Failed"}`, `All teams ${rosterValid ? "have exactly" : "do not have"} two active race drivers before round one.`, "Team", 0));
-    transitionNews.push(makeNews("Roster Validation Debug", `Invalid teams: ${rosterRevalidated.invalidTeams}. Emergency drivers generated: ${(postExpiryValidation.emergencyGenerated || 0) + (rosterFixed.emergencyGenerated || 0) + (rosterRevalidated.emergencyGenerated || 0)}.`, "Team", 0));
-    transitionNews.push(makeNews("Lineup Continuity Debug", `Expiring: ${transferStats.expiringContracts}. Eligible: ${transferStats.eligibleRenewals}. Renewal attempts: ${transferStats.renewalAttempts}. Accepted renewals: ${transferStats.acceptedRenewals}. Replacement choices: ${transferStats.replacementChoices}. Re-signings: ${reSigningsCount}. Unchanged teams: ${unchangedLineups}/${TEAMS.length}. Changed teams: ${changedLineups}. Avg retained drivers/team: ${avgContinuity}. Lowest new-seat OVR: ${lowestNewSeatOvr ?? "—"}.`, "Team", 0));
+    transitionNews.push(makeNews("Roster Validation Debug", `Invalid teams: ${rosterRevalidated.invalidTeams}. Emergency drivers generated: ${(rosterFixed.emergencyGenerated || 0) + (rosterRevalidated.emergencyGenerated || 0)}.`, "Team", 0));
+    transitionNews.push(makeNews("Lineup Continuity Debug", `Expiring: ${transferStats.expiringContracts}. Eligible: ${transferStats.eligibleRenewals}. Renewal attempts: ${transferStats.renewalAttempts}. Accepted renewals: ${transferStats.acceptedRenewals}. Skipped renewals: ${transferStats.skippedRenewals || 0}. Skipped reasons: ${skippedReasonSummary}. Replacement choices: ${transferStats.replacementChoices}. Re-signings: ${reSigningsCount}. Unchanged teams: ${unchangedLineups}/${TEAMS.length}. Changed teams: ${changedLineups}. Avg retained drivers/team: ${avgContinuity}. Lowest new-seat OVR: ${lowestNewSeatOvr ?? "—"}. ${inflationWarning}`, "Team", 0));
     const oldestActive = [...sanitizedRosterDrivers].sort((a, b) => b.age - a.age).slice(0, 3).map(d => `${d.name} (${d.age})`).join(", ");
     transitionNews.push(makeNews("Oldest Active Drivers", oldestActive || "No active drivers found after offseason processing.", "Driver", 0));
     transitionNews.push(makeNews(`New Talent Class Arrives`, `${freshProspects.length} new prospects enter the market this season.`, "Driver", 0));
@@ -718,6 +800,8 @@ export default function F1Manager() {
       const bucket8385 = activeDrivers.filter(d => d.ovr >= 83 && d.ovr <= 85).length;
       const bucket86plus = activeDrivers.filter(d => d.ovr >= 86).length;
       const avgGridOvr = activeDrivers.length ? (activeDrivers.reduce((sum, d) => sum + d.ovr, 0) / activeDrivers.length).toFixed(1) : "—";
+      const numericAvgGridOvr = activeDrivers.length ? (activeDrivers.reduce((sum, d) => sum + d.ovr, 0) / activeDrivers.length) : 0;
+      const inflationWarning = numericAvgGridOvr > 85.8 ? `Inflation warning: avg grid OVR ${numericAvgGridOvr.toFixed(1)} is above healthy range.` : "Inflation warning: none.";
       const lowestStarter = [...activeDrivers].sort((a, b) => a.ovr - b.ovr)[0];
       const topYoungProspects = [...safeNext.prospects]
         .filter(d => d.age <= 21)
@@ -758,7 +842,7 @@ export default function F1Manager() {
         .map(row => `${row.team?.name} (car P${row.carRank}, drivers P${row.driverRank})`);
       const summary = makeNews(
         "Dev Sim Summary",
-        `WDC: ${topD?.driver?.name || "—"}. WCC: ${topC?.team?.name || "—"}. Gaps P1-P2/P2-P4: ${p1p2Gap}/${p2p4Gap}. Team buckets 0/1-10/11-50/50+: ${zeroPointTeams.length}/${lowPointsTeams}/${midPointsTeams}/${highPointsTeams}. Lower-half points finishers/race: ${avgLowerHalfPointFinishes}. Roster invalid teams/emergencies: ${finalRosterCheck.invalidTeams}/${finalRosterCheck.emergencyGenerated}. Re-signings: ${offseasonReSignings}. Unchanged lineups: ${unchangedTeams}/${TEAMS.length}. Avg continuity: ${avgContinuity}. Lowest new-seat OVR: ${lowestNewSeatOvr ?? "—"}. Duplicates: ${duplicateNames.length ? duplicateNames.join(", ") : "none"}. Active <80: ${activeBelow80}. Active OVR80+/85+: ${activeOver80}/${activeOver85}. Active buckets 80-82/83-85/86+: ${bucket8082}/${bucket8385}/${bucket86plus}. Avg grid OVR: ${avgGridOvr}. Lowest starter: ${lowestStarter ? `${lowestStarter.name} ${lowestStarter.ovr}` : "—"}. Top U22 prospects: ${topYoungProspects.length ? topYoungProspects.join(", ") : "none"}. Top10 OVR: ${top10Ratings.map(d => `${d.name.split(" ").pop()} ${d.ovr}`).join(", ")}. OVR90+/92+/95+: ${over90}/${over92}/${over95}. OVR80+: ${over80.length}. Top-car team avg OVR: ${topTeamDriverAvg}. Car-driver mismatch: ${mismatchTeams.length ? mismatchTeams.join(", ") : "none"}. Car range: ${sortedCars[sortedCars.length - 1]?.rating ?? "—"}-${sortedCars[0]?.rating ?? "—"}. Zero-point teams: ${zeroPointTeams.length ? zeroPointTeams.join(", ") : "none"}. Constructors: ${constructorOrder}.`,
+        `WDC: ${topD?.driver?.name || "—"}. WCC: ${topC?.team?.name || "—"}. Gaps P1-P2/P2-P4: ${p1p2Gap}/${p2p4Gap}. Team buckets 0/1-10/11-50/50+: ${zeroPointTeams.length}/${lowPointsTeams}/${midPointsTeams}/${highPointsTeams}. Lower-half points finishers/race: ${avgLowerHalfPointFinishes}. Roster invalid teams/emergencies: ${finalRosterCheck.invalidTeams}/${finalRosterCheck.emergencyGenerated}. Re-signings: ${offseasonReSignings}. Unchanged lineups: ${unchangedTeams}/${TEAMS.length}. Avg continuity: ${avgContinuity}. Lowest new-seat OVR: ${lowestNewSeatOvr ?? "—"}. Duplicates: ${duplicateNames.length ? duplicateNames.join(", ") : "none"}. Active <80: ${activeBelow80}. Active OVR80+/85+: ${activeOver80}/${activeOver85}. Active buckets 80-82/83-85/86+: ${bucket8082}/${bucket8385}/${bucket86plus}. Avg grid OVR: ${avgGridOvr}. ${inflationWarning} Lowest starter: ${lowestStarter ? `${lowestStarter.name} ${lowestStarter.ovr}` : "—"}. Top U22 prospects: ${topYoungProspects.length ? topYoungProspects.join(", ") : "none"}. Top10 OVR: ${top10Ratings.map(d => `${d.name.split(" ").pop()} ${d.ovr}`).join(", ")}. OVR90+/92+/95+: ${over90}/${over92}/${over95}. OVR80+: ${over80.length}. Top-car team avg OVR: ${topTeamDriverAvg}. Car-driver mismatch: ${mismatchTeams.length ? mismatchTeams.join(", ") : "none"}. Car range: ${sortedCars[sortedCars.length - 1]?.rating ?? "—"}-${sortedCars[0]?.rating ?? "—"}. Zero-point teams: ${zeroPointTeams.length ? zeroPointTeams.join(", ") : "none"}. Constructors: ${constructorOrder}.`,
         "Team",
         0
       );
@@ -770,7 +854,7 @@ export default function F1Manager() {
     if (myDrivers.length >= 2 || budget < pr.salary) return;
     const sn = genSigningNews(team, pr, raceIndex + 1);
     setGame(p => {
-      const newDrivers = [...p.drivers, { ...pr, ovr: Math.max(80, pr.ovr), teamId: team.id, contractEnd: season + 2 }];
+      const newDrivers = [...p.drivers, { ...pr, teamId: team.id, contractEnd: season + 2 }];
       const effects = applyNewsEffects(sn, { ...p, budget: p.budget - pr.salary });
       return { ...p, drivers: newDrivers, prospects: p.prospects.filter(x => x.id !== pr.id), budget: effects.budget - pr.salary, modifiers: effects.modifiers, news: [...sn, ...p.news] };
     });
@@ -860,18 +944,19 @@ export default function F1Manager() {
           {currentRace && <div style={{ fontSize: 10, color: DIM, letterSpacing: 1 }}>R{raceIndex + 1} · {currentRace.name}</div>}
         </div>
         <div style={{ padding: 20, flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden" }}>
-          {tab === "race" && <RaceTab {...{ currentRace, weekendPhase, qualiResults, qualiWeather, raceResult, raceRevealCount, revealCount, startQuali, startRace, nextWeekend, startNextSeason, team, raceIndex, driverStandings, constructorStandings, season, myDrivers, rivalry, simSeasonDev }} />}
+          {tab === "race" && <RaceTab {...{ currentRace, weekendPhase, qualiResults, qualiWeather, raceResult, raceRevealCount, revealCount, startQuali, startRace, nextWeekend, startNextSeason, team, raceIndex, driverStandings, constructorStandings, season, myDrivers, rivalry, simSeasonDev, openDriverCard: setDriverCardId }} />}
           {tab === "news" && <NewsTab news={news} />}
-          {tab === "squad" && <SquadTab {...{ myDrivers, team, driverPoints, releaseDriver, season }} />}
-          {tab === "scouting" && <ScoutingTab {...{ prospects, budget, signProspect, myDrivers, team }} />}
-          {tab === "grid" && <GridTab {...{ drivers, driverPoints, team, season, teamCars, teamCarProfiles }} />}
+          {tab === "squad" && <SquadTab {...{ myDrivers, team, driverPoints, releaseDriver, season, openDriverCard: setDriverCardId }} />}
+          {tab === "scouting" && <ScoutingTab {...{ prospects, budget, signProspect, myDrivers, team, openDriverCard: setDriverCardId }} />}
+          {tab === "grid" && <GridTab {...{ drivers, driverPoints, team, season, teamCars, teamCarProfiles, openDriverCard: setDriverCardId }} />}
           {tab === "profiles" && <ProfilesTab {...{ drivers, teams: TEAMS, team, driverPoints, constructorPoints, season, driverSeasonStats, driverCareer, teamSeasonStats, teamHistory, teamCars }} />}
-          {tab === "contracts" && <ContractsTab {...{ drivers, season, team, driverPoints }} />}
-          {tab === "standings" && <StandingsTab {...{ driverStandings, constructorStandings, team }} />}
+          {tab === "contracts" && <ContractsTab {...{ drivers, season, team, driverPoints, openDriverCard: setDriverCardId }} />}
+          {tab === "standings" && <StandingsTab {...{ driverStandings, constructorStandings, team, openDriverCard: setDriverCardId }} />}
           {tab === "calendar" && <CalendarTab {...{ raceIndex, raceResults, team, season }} />}
           {tab === "history" && <HistoryTab history={history} team={team} rivalry={rivalry} />}
         </div>
       </div>
+      <DriverHistoryModal driver={cardDriver} season={season} driverPoints={driverPoints} driverSeasonStats={driverSeasonStats} driverCareer={driverCareer} onClose={() => setDriverCardId(null)} />
     </div>
   );
 }
@@ -911,7 +996,7 @@ function NewsTab({ news }) {
 /* ═══════════════════════════════════════════
    RACE WEEKEND TAB
    ═══════════════════════════════════════════ */
-function RaceTab({ currentRace, weekendPhase, qualiResults, qualiWeather, raceResult, raceRevealCount, revealCount, startQuali, startRace, nextWeekend, startNextSeason, team, raceIndex, driverStandings, constructorStandings, season, myDrivers, rivalry, simSeasonDev }) {
+function RaceTab({ currentRace, weekendPhase, qualiResults, qualiWeather, raceResult, raceRevealCount, revealCount, startQuali, startRace, nextWeekend, startNextSeason, team, raceIndex, driverStandings, constructorStandings, season, myDrivers, rivalry, simSeasonDev, openDriverCard }) {
   if (raceIndex >= RACES_2026.length) {
     const cPos = constructorStandings.findIndex(s => s.team?.id === team.id) + 1;
     const myDStandings = myDrivers.map(d => {
@@ -940,7 +1025,7 @@ function RaceTab({ currentRace, weekendPhase, qualiResults, qualiWeather, raceRe
           <div style={{ fontSize: 9, color: DIM, letterSpacing: 2, marginBottom: 8 }}>YOUR DRIVERS</div>
           {myDStandings.map(d => (
             <div key={d.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: `1px solid ${BORDER}` }}>
-              <span style={{ color: "#fff", fontWeight: 700 }}>{d.name}</span>
+              <DriverLink driver={d} onOpen={openDriverCard} color="#fff" />
               <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
                 <span style={{ color: "#E2B53A", fontWeight: 700 }}>{d.pts} pts</span>
                 <span style={{ color: d.pos <= 3 ? "#E2B53A" : DIM, fontWeight: 700 }}>P{d.pos || "—"}</span>
@@ -954,7 +1039,7 @@ function RaceTab({ currentRace, weekendPhase, qualiResults, qualiWeather, raceRe
             <div style={{ fontSize: 9, color: "#F87171", letterSpacing: 2, marginBottom: 6 }}>CONTRACT EXPIRIES</div>
             {expiringContracts.map(d => (
               <div key={d.id} style={{ fontSize: 11, color: "#F87171" }}>
-                {d.name}'s contract expires — they will leave unless re-signed
+                <DriverLink driver={d} onOpen={openDriverCard} color="#F87171" />'s contract expires — they will leave unless re-signed
               </div>
             ))}
           </div>
@@ -1044,7 +1129,7 @@ function RaceTab({ currentRace, weekendPhase, qualiResults, qualiWeather, raceRe
               const gap = i === 0 ? "" : d.crashed ? "" : `+${(d.lapTime - qualiResults[0]?.lapTime).toFixed(3)}`;
               return (<tr key={d.id} style={{ borderBottom: `1px solid ${BORDER}`, background: mine ? `${team.color}25` : "transparent", opacity: vis ? 1 : 0, transform: vis ? "translateX(0)" : "translateX(-20px)", transition: "all 0.3s ease-out" }}>
                 <td style={{ padding: "8px", fontWeight: 700, color: i === 0 ? "#fff" : i < 3 ? TEXT : DIM, width: 36 }}>{i + 1}</td>
-                <td style={{ padding: "8px", fontWeight: mine ? 800 : 400, color: mine ? "#fff" : TEXT }}>{d.name}</td>
+                <td style={{ padding: "8px", fontWeight: mine ? 800 : 400, color: mine ? "#fff" : TEXT }}><DriverLink driver={d} onOpen={openDriverCard} color={mine ? "#fff" : TEXT} weight={mine ? 800 : 500} /></td>
                 <td style={{ padding: "8px" }}><span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><TeamBadge teamId={d.teamId} size={14} /><span style={{ color: DIM, fontSize: 11 }}>{dt?.name}</span></span></td>
                 <td style={{ padding: "8px", fontFamily: "'Courier New', monospace", color: d.crashed ? "#EF4444" : i === 0 ? BLUE : TEXT2 }}>{d.crashed ? "NO TIME" : formatTime(d.lapTime)}</td>
                 <td style={{ padding: "8px", color: DIM, fontSize: 11 }}>{gap}</td>
@@ -1075,7 +1160,7 @@ function RaceTab({ currentRace, weekendPhase, qualiResults, qualiWeather, raceRe
               return c > b ? cur : best;
             }, null) : null;
             return (<>
-              {fastestLap && <div style={{ marginBottom: 8, fontSize: 10, letterSpacing: 2, color: "#C084FC", fontWeight: 700 }}>⚡ FASTEST LAP: {fastestLap.name}</div>}
+              {fastestLap && <div style={{ marginBottom: 8, fontSize: 10, letterSpacing: 2, color: "#C084FC", fontWeight: 700 }}>⚡ FASTEST LAP: <DriverLink driver={fastestLap} onOpen={openDriverCard} color="#C084FC" /></div>}
               <table style={{ width: "100%", maxWidth: 750, borderCollapse: "collapse" }}>
                 <thead><tr style={{ borderBottom: `1px solid ${BORDER2}` }}>{["POS", "DRIVER", "TEAM", "GRID", "+/-", "PTS", "FL"].map(h => (<th key={h} style={{ textAlign: "left", padding: "6px 8px", fontSize: 8, color: DIM, letterSpacing: 2, fontWeight: 600 }}>{h}</th>))}</tr></thead>
                 <tbody>{raceResult.results.map((d, i) => {
@@ -1089,7 +1174,7 @@ function RaceTab({ currentRace, weekendPhase, qualiResults, qualiWeather, raceRe
                     <td style={{ padding: "8px", fontWeight: 800, color: d.dnf ? "#EF4444" : i < 3 ? "#fff" : DIM, width: 44 }}>{d.dnf ? "DNF" : i + 1}</td>
                     <td style={{ padding: "8px", fontWeight: mine ? 800 : 500, color: d.dnf ? "#FCA5A5" : mine ? "#fff" : TEXT, textDecoration: d.dnf ? "line-through" : "none" }}>
                       {i < 3 && !d.dnf ? <span style={{ marginRight: 5 }}>{i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉"}</span> : null}
-                      {d.name}
+                      <DriverLink driver={d} onOpen={openDriverCard} color={d.dnf ? "#FCA5A5" : mine ? "#fff" : TEXT} weight={mine ? 800 : 500} />
                     </td>
                     <td style={{ padding: "8px" }}><span style={{ display: "inline-flex", alignItems: "center", gap: 5, opacity: d.dnf ? 0.75 : 1 }}><TeamBadge teamId={d.teamId} size={14} /><span style={{ color: DIM, fontSize: 11 }}>{dt?.name}</span></span></td>
                     <td style={{ padding: "8px", color: DIM, fontSize: 11 }}>P{d.gridPos}</td>
@@ -1117,14 +1202,14 @@ function RaceTab({ currentRace, weekendPhase, qualiResults, qualiWeather, raceRe
 /* ═══════════════════════════════════════════
    REMAINING TABS
    ═══════════════════════════════════════════ */
-function SquadTab({ myDrivers, team, driverPoints, releaseDriver, season }) {
+function SquadTab({ myDrivers, team, driverPoints, releaseDriver, season, openDriverCard }) {
   if (myDrivers.length === 0) return <div style={{ color: DIM, padding: 40, textAlign: "center" }}>No drivers. Visit Scouting.</div>;
   return (<div><Sec>YOUR DRIVERS</Sec>
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, maxWidth: 780 }}>
       {myDrivers.map((d, i) => (
         <div key={d.id} style={{ background: BG3, border: `1px solid ${BORDER}`, padding: 18 }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
-            <div><div style={{ fontSize: 9, color: BLUE, letterSpacing: 2, marginBottom: 3 }}>DRIVER {i + 1}</div><div style={{ fontSize: 16, fontWeight: 900, color: "#fff", fontFamily: "'Arial Black', sans-serif" }}>{d.name}</div><div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>Age {d.age} · OVR <span style={{ color: "#E2B53A" }}>{d.ovr}</span></div></div>
+            <div><div style={{ fontSize: 9, color: BLUE, letterSpacing: 2, marginBottom: 3 }}>DRIVER {i + 1}</div><div style={{ fontSize: 16, fontWeight: 900, color: "#fff", fontFamily: "'Arial Black', sans-serif" }}><DriverLink driver={d} onOpen={openDriverCard} color="#fff" /></div><div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>Age {d.age} · OVR <span style={{ color: "#E2B53A" }}>{d.ovr}</span></div></div>
             <div style={{ textAlign: "right" }}><div style={{ fontSize: 24, fontWeight: 900, color: team.color, fontFamily: "'Arial Black', sans-serif" }}>{driverPoints[d.id] || 0}</div><div style={{ fontSize: 9, color: DIM }}>PTS</div></div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 14 }}>
@@ -1149,7 +1234,7 @@ function SquadTab({ myDrivers, team, driverPoints, releaseDriver, season }) {
   </div>);
 }
 
-function ScoutingTab({ prospects, budget, signProspect, myDrivers, team }) {
+function ScoutingTab({ prospects, budget, signProspect, myDrivers, team, openDriverCard }) {
   const canSign = myDrivers.length < 2;
   const [filter, setFilter] = useState("all");
   const filtered = filter === "all" ? prospects : prospects.filter(p => p.series === filter);
@@ -1160,7 +1245,7 @@ function ScoutingTab({ prospects, budget, signProspect, myDrivers, team }) {
       {["all", "F2", "F3", "IndyCar", "Free Agent"].map(f => (<button key={f} onClick={() => setFilter(f)} style={{ padding: "5px 14px", background: filter === f ? "rgba(0,0,0,0.15)" : "transparent", border: `1px solid ${filter === f ? BORDER2 : BORDER}`, color: filter === f ? "#fff" : DIM, cursor: "pointer", fontSize: 10, fontFamily: "inherit", letterSpacing: 1, fontWeight: filter === f ? 700 : 400 }}>{f === "all" ? "ALL" : f.toUpperCase()}</button>))}
     </div>
     <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(140px, 1fr))", gap: 8, marginBottom: 14 }}>
-      <DashCard title="BEST AVAILABLE" accent="#E2B53A">{sorted[0] ? `${sorted[0].name} · OVR ${sorted[0].ovr}` : "No candidates"}</DashCard>
+      <DashCard title="BEST AVAILABLE" accent="#E2B53A">{sorted[0] ? <><DriverLink driver={sorted[0]} onOpen={openDriverCard} color={TEXT2} /> · OVR {sorted[0].ovr}</> : "No candidates"}</DashCard>
       <DashCard title="HIGHEST POTENTIAL" accent="#C084FC">{sorted.length > 0 ? `${[...sorted].sort((a,b)=>b.pot-a.pot)[0].name} · POT ${[...sorted].sort((a,b)=>b.pot-a.pot)[0].pot}` : "No candidates"}</DashCard>
       <DashCard title="BEST VALUE" accent="#4ADE80">{sorted.length > 0 ? `${[...sorted].sort((a,b)=>(a.salary/(a.ovr||1))-(b.salary/(b.ovr||1)))[0].name} · $${[...sorted].sort((a,b)=>(a.salary/(a.ovr||1))-(b.salary/(b.ovr||1)))[0].salary}M` : "No candidates"}</DashCard>
       <DashCard title="LINEUP COMPARISON" accent={team.color}>{myDrivers.length > 0 && sorted[0] ? `${sorted[0].ovr - Math.min(...myDrivers.map(d=>d.ovr)) >= 0 ? "+" : ""}${sorted[0].ovr - Math.min(...myDrivers.map(d=>d.ovr))} vs weaker current driver` : "Sign drivers to unlock comparison"}</DashCard>
@@ -1170,7 +1255,7 @@ function ScoutingTab({ prospects, budget, signProspect, myDrivers, team }) {
       <tbody>{sorted.map(p => {
         const seriesCol = p.series === "F2" ? { bg: "rgba(59,130,246,0.3)", fg: "#60A5FA" } : p.series === "IndyCar" ? { bg: "rgba(239,68,68,0.3)", fg: "#F87171" } : p.series === "Free Agent" ? { bg: "rgba(255,255,255,0.15)", fg: "#fff" } : { bg: "rgba(34,197,94,0.3)", fg: "#4ADE80" };
         return (<tr key={p.id} style={{ borderBottom: `1px solid ${BORDER}` }}>
-        <td style={{ padding: "9px 8px", color: "#fff", fontWeight: 700 }}>{p.name}</td>
+        <td style={{ padding: "9px 8px", color: "#fff", fontWeight: 700 }}><DriverLink driver={p} onOpen={openDriverCard} color="#fff" /></td>
         <td style={{ padding: "9px 8px" }}><span style={{ fontSize: 9, padding: "1px 6px", fontWeight: 700, letterSpacing: 1, background: seriesCol.bg, color: seriesCol.fg }}>{p.series}</span></td>
         <td style={{ padding: "9px 8px", color: TEXT2 }}>{p.age}</td>
         <td style={{ padding: "9px 8px", color: "#E2B53A", fontWeight: 700 }}>{p.ovr}</td>
@@ -1187,7 +1272,7 @@ function ScoutingTab({ prospects, budget, signProspect, myDrivers, team }) {
   </div>);
 }
 
-function GridTab({ drivers, driverPoints, team, season, teamCars, teamCarProfiles }) {
+function GridTab({ drivers, driverPoints, team, season, teamCars, teamCarProfiles, openDriverCard }) {
   return (<div><Sec>{season} F1 GRID</Sec>
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, maxWidth: 850 }}>
       {TEAMS.map(t => {
@@ -1204,7 +1289,7 @@ function GridTab({ drivers, driverPoints, team, season, teamCars, teamCarProfile
           {teamCarProfiles?.[t.id] && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4, marginBottom: 6 }}>
             {["aero", "power", "grip", "tyreWear", "reliability"].map(k => <div key={k} style={{ fontSize: 8, color: DIM2 }}>{k.toUpperCase().replace("TYREWEAR", "TYRE")} <span style={{ color: TEXT2 }}>{teamCarProfiles[t.id][k]}</span></div>)}
           </div>}
-          {td.map(d => (<div key={d.id} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}><span style={{ color: mine ? "#fff" : TEXT2 }}>{d.name}</span><div style={{ display: "flex", gap: 12 }}><span style={{ fontSize: 10, color: DIM }}>OVR {d.ovr}</span><span style={{ fontSize: 10, color: "#E2B53A", fontWeight: 700 }}>{driverPoints[d.id] || 0} pts</span></div></div>))}
+          {td.map(d => (<div key={d.id} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}><span style={{ color: mine ? "#fff" : TEXT2 }}><DriverLink driver={d} onOpen={openDriverCard} color={mine ? "#fff" : TEXT2} /></span><div style={{ display: "flex", gap: 12 }}><span style={{ fontSize: 10, color: DIM }}>OVR {d.ovr}</span><span style={{ fontSize: 10, color: "#E2B53A", fontWeight: 700 }}>{driverPoints[d.id] || 0} pts</span></div></div>))}
         </div>);
       })}
     </div>
@@ -1355,7 +1440,7 @@ function ProfilesTab({ drivers, teams, team, driverPoints, constructorPoints, se
   );
 }
 
-function ContractsTab({ drivers, season, team, driverPoints }) {
+function ContractsTab({ drivers, season, team, driverPoints, openDriverCard }) {
   const freeAgents = drivers.filter(d => d.teamId === null).sort((a, b) => b.ovr - a.ovr);
   const contracted = drivers.filter(d => d.teamId !== null).sort((a, b) => (a.contractEnd || 0) - (b.contractEnd || 0));
 
@@ -1372,7 +1457,7 @@ function ContractsTab({ drivers, season, team, driverPoints }) {
               const danger = yrs <= 1;
               const mine = d.teamId === team.id;
               return <tr key={d.id} style={{ borderBottom: `1px solid ${BORDER}`, background: mine ? `${team.color}1f` : "transparent" }}>
-                <td style={{ padding: "8px", color: mine ? "#fff" : TEXT, fontWeight: mine ? 700 : 500 }}>{d.name}</td>
+                <td style={{ padding: "8px", color: mine ? "#fff" : TEXT, fontWeight: mine ? 700 : 500 }}><DriverLink driver={d} onOpen={openDriverCard} color={mine ? "#fff" : TEXT} weight={mine ? 700 : 500} /></td>
                 <td style={{ padding: "8px", color: TEXT2, fontSize: 11 }}>{t?.name}</td>
                 <td style={{ padding: "8px", color: danger ? "#F87171" : "#4ADE80", fontWeight: 700 }}>{d.contractEnd}</td>
                 <td style={{ padding: "8px", color: danger ? "#F87171" : DIM }}>{yrs}</td>
@@ -1388,7 +1473,7 @@ function ContractsTab({ drivers, season, team, driverPoints }) {
           <thead><tr style={{ borderBottom: `1px solid ${BORDER2}` }}>{["DRIVER", "AGE", "OVR", "LAST PTS", "ASKING"].map(h => <th key={h} style={{ textAlign: "left", padding: "6px 8px", fontSize: 8, color: DIM, letterSpacing: 2 }}>{h}</th>)}</tr></thead>
           <tbody>
             {freeAgents.length === 0 ? <tr><td style={{ padding: "12px 8px", color: DIM, fontSize: 11 }} colSpan={5}>No free agents currently.</td></tr> : freeAgents.map(d => <tr key={d.id} style={{ borderBottom: `1px solid ${BORDER}` }}>
-              <td style={{ padding: "8px", color: "#fff", fontWeight: 700 }}>{d.name}</td>
+              <td style={{ padding: "8px", color: "#fff", fontWeight: 700 }}><DriverLink driver={d} onOpen={openDriverCard} color="#fff" /></td>
               <td style={{ padding: "8px", color: DIM }}>{d.age}</td>
               <td style={{ padding: "8px", color: "#E2B53A", fontWeight: 700 }}>{d.ovr}</td>
               <td style={{ padding: "8px", color: TEXT2 }}>{driverPoints[d.id] || 0}</td>
@@ -1401,7 +1486,7 @@ function ContractsTab({ drivers, season, team, driverPoints }) {
   );
 }
 
-function StandingsTab({ driverStandings, constructorStandings, team }) {
+function StandingsTab({ driverStandings, constructorStandings, team, openDriverCard }) {
   if (driverStandings.length === 0) return <div style={{ color: DIM, padding: 40, textAlign: "center" }}>Complete a race first.</div>;
   const myTeam = constructorStandings.find(s => s.team?.id === team.id);
   const myPos = constructorStandings.findIndex(s => s.team?.id === team.id) + 1;
@@ -1417,7 +1502,7 @@ function StandingsTab({ driverStandings, constructorStandings, team }) {
     </div>
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 28, maxWidth: 980 }}>
     <div><Sec>DRIVERS'</Sec><table style={{ width: "100%", borderCollapse: "collapse" }}><tbody>
-      {driverStandings.map((s, i) => { const mine = s.driver?.teamId === team.id; return (<tr key={s.driver?.id} style={{ borderBottom: `1px solid ${BORDER}`, background: mine ? `${team.color}25` : "transparent" }}><td style={{ padding: "6px 8px", color: i < 3 ? BLUE : DIM, fontWeight: 700, width: 28 }}>{i + 1}</td><td style={{ padding: "6px 8px" }}><span style={{ color: mine ? "#fff" : TEXT, fontWeight: mine ? 800 : 400 }}>{s.driver?.name}</span> <TeamBadge teamId={s.driver?.teamId} size={12} /></td><td style={{ padding: "6px 8px", textAlign: "right", color: "#E2B53A", fontWeight: 700 }}>{s.pts}</td></tr>); })}
+      {driverStandings.map((s, i) => { const mine = s.driver?.teamId === team.id; return (<tr key={s.driver?.id} style={{ borderBottom: `1px solid ${BORDER}`, background: mine ? `${team.color}25` : "transparent" }}><td style={{ padding: "6px 8px", color: i < 3 ? BLUE : DIM, fontWeight: 700, width: 28 }}>{i + 1}</td><td style={{ padding: "6px 8px" }}><DriverLink driver={s.driver} onOpen={openDriverCard} color={mine ? "#fff" : TEXT} weight={mine ? 800 : 500} /> <TeamBadge teamId={s.driver?.teamId} size={12} /></td><td style={{ padding: "6px 8px", textAlign: "right", color: "#E2B53A", fontWeight: 700 }}>{s.pts}</td></tr>); })}
     </tbody></table></div>
     <div><Sec>CONSTRUCTORS'</Sec><table style={{ width: "100%", borderCollapse: "collapse" }}><tbody>
       {constructorStandings.map((s, i) => { const mine = s.team?.id === team.id; return (<tr key={s.team?.id} style={{ borderBottom: `1px solid ${BORDER}`, background: mine ? `${team.color}25` : "transparent" }}><td style={{ padding: "6px 8px", color: i < 3 ? BLUE : DIM, fontWeight: 700, width: 28 }}>{i + 1}</td><td style={{ padding: "6px 8px" }}><span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><TeamBadge teamId={s.team?.id} size={16} /><span style={{ color: mine ? "#fff" : TEXT, fontWeight: mine ? 800 : 400 }}>{s.team?.name}</span></span></td><td style={{ padding: "6px 8px", textAlign: "right", color: "#E2B53A", fontWeight: 700 }}>{s.pts}</td></tr>); })}
