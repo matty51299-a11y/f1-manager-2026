@@ -379,15 +379,15 @@ function aiTransfers(drivers, prospects, teamId, newSeason, transitionNews, driv
       const replacementGap = bestMarket - value;
       const fitScore = d.ovr - (carNow >= 92 ? 84 : carNow >= 88 ? 81 : 78);
       const continuityBonus = retained.some(r => r.id === d.id) ? 0.12 : 0;
-      let resignChance = 0.52 + continuityBonus;
+      let resignChance = 0.64 + continuityBonus;
       if (value >= threshold) resignChance += 0.2;
       if (perfPts >= 100) resignChance += 0.15;
       else if (perfPts >= 50) resignChance += 0.08;
       if (fitScore >= 2) resignChance += 0.08;
-      if (replacementGap > 6) resignChance -= 0.2;
-      if (d.ovr < 80) resignChance -= (d.lowOvrSeasons || 0) >= 2 ? 0.45 : 0.22;
+      if (replacementGap > 6) resignChance -= 0.16;
+      if (d.ovr < 80) resignChance -= (d.lowOvrSeasons || 0) >= 2 ? 0.38 : 0.16;
       if (decline <= -2) resignChance -= 0.12;
-      if (carNow >= 90 && d.ovr < 82) resignChance -= 0.2;
+      if (carNow >= 90 && d.ovr < 82) resignChance -= 0.14;
       resignChance = Math.max(0.05, Math.min(0.95, resignChance));
       const shouldResign = maybe(resignChance) || value >= threshold + 7;
       if (shouldResign) {
@@ -409,8 +409,10 @@ function aiTransfers(drivers, prospects, teamId, newSeason, transitionNews, driv
     while (lineup.length < 2) {
       marketPool = updatedDrivers.filter(d => d.teamId === null).sort((a, b) => driverValue(b) - driverValue(a));
       const prospectPool = [...availableProspects].sort((a, b) => (b.ovr + (b.pot || b.ovr) * 0.2) - (a.ovr + (a.pot || a.ovr) * 0.2));
+      const minFaOvr = carNow >= 92 ? 82 : carNow >= 88 ? 80 : carNow >= 82 ? 78 : 76;
+      const preferredFA = marketPool.filter(d => d.ovr >= minFaOvr);
 
-      const bestFA = marketPool[0];
+      const bestFA = preferredFA[0] || marketPool[0];
       const bestProspect = prospectPool[0];
       if (!bestFA && !bestProspect) break;
 
@@ -597,12 +599,51 @@ function initGame(pid) {
   _newsId = 0;
   const pt = TEAMS.find(t => t.id === pid);
   const drivers = F1_DRIVERS.map((d, i) => ({ ...d, id: i, pot: d.pot || Math.min(98, d.ovr + (d.age <= 22 ? 12 : d.age <= 27 ? 7 : d.age <= 32 ? 3 : 1)) }));
+  const baseProspects = PROSPECTS.map((p, i) => ({ ...p, id: 100 + i, teamId: null, contractEnd: null }));
+  const totalTargetDrivers = 100;
+  const extraNeeded = Math.max(0, totalTargetDrivers - drivers.length - baseProspects.length);
+  const firstNames = ["Luca", "Enzo", "Noah", "Mika", "Theo", "Riku", "Ivan", "Sami", "Yuki", "Ari", "Leo", "Oscar", "Dani", "Nico", "Maxim", "Rafael", "Tom", "Kai", "Elias", "Adam"];
+  const lastNames = ["Costa", "Berger", "Tanaka", "Nowak", "Silva", "Meyer", "Sato", "Marin", "Patel", "Byrne", "Schultz", "Lindqvist", "Fernandez", "Petrov", "Bauer", "Khan", "Rossi", "Vasseur", "Carlsen", "Stenberg"];
+  const usedNames = new Set([...drivers, ...baseProspects].map(d => d.name.toLowerCase()));
+  const makeUniqueName = () => {
+    for (let i = 0; i < 30; i++) {
+      const n = `${pick(firstNames)} ${pick(lastNames)}`;
+      if (!usedNames.has(n.toLowerCase())) { usedNames.add(n.toLowerCase()); return n; }
+    }
+    const fallback = `${pick(firstNames)} ${pick(lastNames)} ${Math.floor(Math.random() * 900 + 100)}`;
+    usedNames.add(fallback.toLowerCase());
+    return fallback;
+  };
+  const generatedMarketDrivers = Array.from({ length: extraNeeded }, (_, i) => {
+    const tierRoll = Math.random();
+    const topReady = i < 8 || tierRoll < 0.1;
+    const upperMid = !topReady && (i < 24 || tierRoll < 0.38);
+    const ovr = topReady ? pick([80, 81, 82, 83]) : upperMid ? pick([76, 77, 78, 79, 80]) : pick([68, 69, 70, 71, 72, 73, 74, 75, 76]);
+    const pot = topReady ? pick([88, 89, 90, 91, 92, 93]) : upperMid ? pick([82, 83, 84, 85, 86, 87, 88]) : pick([74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84]);
+    const age = topReady ? pick([19, 20, 21, 22, 23]) : upperMid ? pick([20, 21, 22, 23, 24, 25]) : pick([18, 19, 20, 21, 22, 23, 24, 25, 26, 27]);
+    const series = topReady ? pick(["F2", "Reserve", "Free Agent"]) : upperMid ? pick(["F2", "Reserve", "IndyCar"]) : pick(["F3", "F2", "Reserve", "Free Agent"]);
+    return {
+      id: 1000 + i,
+      name: makeUniqueName(),
+      age,
+      ovr,
+      pace: pick([3, 3, 4, 4, 5]),
+      consistency: pick([2, 3, 3, 4, 4]),
+      wet: pick([2, 3, 3, 4]),
+      series,
+      salary: Math.max(1, Math.round(ovr / 27)),
+      pot: Math.max(ovr + 1, pot),
+      teamId: null,
+      contractEnd: null,
+    };
+  });
+  const prospects = [...baseProspects, ...generatedMarketDrivers];
   const myD = drivers.filter(d => d.teamId === pid);
   const startNews = genSeasonStart(pt, myD, 0);
   const effects = applyNewsEffects(startNews, { budget: 70, modifiers: [], team: pt, drivers });
   const teamCars = {}; const teamCarProfiles = {}; TEAMS.forEach(t => { teamCars[t.id] = t.car; teamCarProfiles[t.id] = { aero: t.car, power: t.car, grip: t.car - 1, tyreWear: t.car - 2, reliability: t.car - 1, overall: t.car }; });
   return {
-    team: pt, drivers, prospects: PROSPECTS.map((p, i) => ({ ...p, id: 100 + i, teamId: null, contractEnd: null })),
+    team: pt, drivers, prospects,
     budget: effects.budget, season: 2026, raceIndex: 0,
     raceResults: [], driverPoints: {}, constructorPoints: {},
     tab: "race", weekendPhase: "preview",

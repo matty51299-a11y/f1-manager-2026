@@ -66,6 +66,11 @@ You run an F1 team across multiple seasons: hire drivers, manage contracts/budge
 - Update this file at the end of each dev session.
 
 ## Change Log
+### v0.1.7
+- Added large startup talent-pool expansion (~100 total drivers) with explicit F1-ready depth bands to stabilize early-season AI signings.
+- Rebalanced retirement safeguards to prevent unrealistic young retirements except extreme edge cases.
+- Tuned AI contract renewals and signing standards to improve lineup continuity and reduce sub-standard race-seat churn.
+
 ### v0.1.6
 - Rebalanced AI re-signing so contract renewals are now a common outcome for fitting/performing drivers, reducing unrealistic yearly churn.
 - Removed artificial seat-entry OVR inflation and improved prospect generation toward naturally F1-ready high-end youth.

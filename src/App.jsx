@@ -182,6 +182,14 @@ function ensureValidTeamRosters(drivers, prospects, newSeason, transitionNews = 
 }
 
 function retirementChanceForDriver(driver, perfPts, hasSeat) {
+  if (driver.age < 28) {
+    if (!hasSeat && driver.ovr <= 68 && (driver.lowOvrSeasons || 0) >= 2) return 0.12;
+    return 0;
+  }
+  if (driver.age < 30) {
+    if (!hasSeat && driver.ovr <= 70) return 0.04;
+    return 0.005;
+  }
   if (driver.age >= 47) return 0.995;
 
   const ovrDelta = driver._ovrDelta || 0;
@@ -545,12 +553,13 @@ export default function F1Manager() {
 
     transitionNews.push(makeNews(`${newSeason} Season Begins`, `A new year dawns for ${team.name}. Base budget $${baseBudget}M + prize money $${prizeMoney}M from P${cPos}.`, "Team", 0));
     if (retiredDrivers.length > 0) {
+      const youngRetirements = retiredDrivers.filter(d => d.age < 30).length;
       const headlineRetirees = retiredDrivers
         .sort((a, b) => (b._ovrDelta || 0) - (a._ovrDelta || 0))
         .slice(0, 3)
         .map(d => `${d.name} (${d.age})`)
         .join(", ");
-      transitionNews.push(makeNews("Retirements Confirmed", `${retiredDrivers.length} driver(s) retired this offseason: ${headlineRetirees}.`, "Driver", 0));
+      transitionNews.push(makeNews("Retirements Confirmed", `${retiredDrivers.length} driver(s) retired this offseason: ${headlineRetirees}. Young retirements (<30): ${youngRetirements}.`, "Driver", 0));
     }
     releasedDrivers.forEach(rd => transitionNews.push(makeNews(`${rd.name} Contract Expired`, `${rd.name}'s deal with ${team.name} has ended. The seat is now open.`, "Driver", 0)));
 
