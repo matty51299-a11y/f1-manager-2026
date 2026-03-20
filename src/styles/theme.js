@@ -1,7 +1,7 @@
 /* THEME */
 const BG = "#090D16", BG2 = "#101827", BG3 = "#1A2435";
 const BORDER = "rgba(153, 187, 255, 0.2)", BORDER2 = "rgba(168, 200, 255, 0.36)";
-const DIM = "rgba(234,242,255,0.7)", DIM2 = "rgba(220,232,252,0.52)", DIM3 = "rgba(209,223,248,0.3)";
+const DIM = "rgba(214,226,242,0.78)", DIM2 = "#9fb3c8", DIM3 = "rgba(159,179,200,0.42)";
 const TEXT = "#F5F9FF", TEXT2 = "rgba(241,247,255,0.9)";
 const GOLD = "#FFD76B", BLUE = "#6EA7FF", BLUE2 = "#4D87F2";
 

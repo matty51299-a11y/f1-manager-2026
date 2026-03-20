@@ -31,7 +31,8 @@ function potBar(pot) { const pct = ((pot - 60) / 40) * 100; const col = pot >= 8
 function Sec({ children }) { return <div style={{ fontSize: 10, letterSpacing: 3, color: "#fff", fontWeight: 700, marginBottom: 14, paddingBottom: 6, borderBottom: `1px solid ${BLUE}33` }}>{children}</div>; }
 function TS({ label, value, sub, color }) { return (<div><div style={{ fontSize: 9, color: DIM, letterSpacing: 2, marginBottom: 1 }}>{label}</div><div style={{ display: "flex", alignItems: "baseline", gap: 4 }}><span style={{ fontSize: 20, fontWeight: 900, color: color || "#fff", fontFamily: "'Arial Black', sans-serif" }}>{value}</span>{sub && <span style={{ fontSize: 9, color: DIM }}>{sub}</span>}</div></div>); }
 function DashCard({ title, children, accent }) {
-  return <div style={{ background: `linear-gradient(155deg, ${BG3} 5%, rgba(20,27,40,0.95) 55%, rgba(29,38,56,0.95) 100%)`, border: `1px solid ${accent ? accent + "88" : BORDER}`, boxShadow: accent ? `0 0 0 1px ${accent}22 inset, 0 10px 24px rgba(0,0,0,0.28)` : "0 8px 18px rgba(0,0,0,0.22)", padding: "12px 14px", minHeight: 88 }}><div style={{ fontSize: 8, color: accent || DIM, letterSpacing: 2, marginBottom: 6, fontWeight: 700 }}>{title}</div><div style={{ fontSize: 11, color: TEXT2, lineHeight: 1.5 }}>{children}</div></div>;
+  const cardVariant = accent === "#4ADE80" ? "card-green" : accent === "#F87171" ? "card-red" : accent === "#E2B53A" ? "card-yellow" : "card-blue";
+  return <div className={`card ${cardVariant}`} style={{ borderColor: accent ? `${accent}55` : BORDER, boxShadow: accent ? `0 0 0 1px ${accent}22 inset, 0 10px 24px rgba(0,0,0,0.28)` : "0 8px 18px rgba(0,0,0,0.22)", padding: "12px 14px", minHeight: 88 }}><div style={{ fontSize: 8, color: accent || DIM, letterSpacing: 2.5, marginBottom: 6, fontWeight: 800 }}>{title}</div><div style={{ fontSize: 11, color: "#9fb3c8", lineHeight: 1.5 }}>{children}</div></div>;
 }
 function DriverLink({ driver, onOpen, color = TEXT, weight = 700 }) {
   if (!driver) return <span style={{ color }}>—</span>;
@@ -52,8 +53,8 @@ function DriverHistoryModal({ driver, season, driverPoints, driverSeasonStats, d
   const yearsRemaining = driver.contractEnd ? Math.max(0, driver.contractEnd - season) : 0;
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={onClose}>
-      <div style={{ width: "min(940px, 96vw)", maxHeight: "90vh", overflow: "auto", background: BG2, border: `1px solid ${BORDER2}`, padding: 18 }} onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
+      <div style={{ width: "min(940px, 96vw)", maxHeight: "90vh", overflow: "auto", background: `linear-gradient(160deg, ${BG2}, #162033 58%, #1E2A3F)`, border: `1px solid ${BORDER2}`, boxShadow: "0 22px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(90,141,239,0.28) inset", padding: 18 }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14, padding: "10px 12px", border: `1px solid rgba(91,141,239,0.35)`, background: "linear-gradient(135deg, rgba(91,141,239,0.18), rgba(192,132,252,0.14))" }}>
           <div>
             <div style={{ fontSize: 24, color: "#fff", fontWeight: 900, fontFamily: "'Arial Black', sans-serif" }}>{driver.name}</div>
             <div style={{ fontSize: 11, color: DIM }}>Team: {currentTeam?.name || "Free Agent"} · Age {driver.age} · OVR {driver.ovr} · POT {driver.pot || "—"} · Contract years left {yearsRemaining}</div>
@@ -63,18 +64,20 @@ function DriverHistoryModal({ driver, season, driverPoints, driverSeasonStats, d
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead><tr style={{ borderBottom: `1px solid ${BORDER2}` }}>{["SEASON", "TEAM", "OVR", "PTS", "W", "POD", "POLE", "FIN POS"].map(h => <th key={h} style={{ textAlign: "left", padding: "7px 8px", fontSize: 8, letterSpacing: 2, color: DIM }}>{h}</th>)}</tr></thead>
           <tbody>
-            {rows.map((row, idx) => (
-              <tr key={idx} style={{ borderBottom: `1px solid ${BORDER}` }}>
+            {rows.map((row, idx) => {
+              const changedTeam = idx < rows.length - 1 && row.teamName !== rows[idx + 1]?.teamName;
+              return (
+              <tr key={idx} style={{ borderBottom: `1px solid ${BORDER}`, background: changedTeam ? "linear-gradient(90deg, rgba(226,181,58,0.1), rgba(91,141,239,0.06))" : (idx % 2 === 0 ? "rgba(255,255,255,0.02)" : "rgba(91,141,239,0.05)") }}>
                 <td style={{ padding: "8px", color: "#fff", fontWeight: 700 }}>{row.season}</td>
-                <td style={{ padding: "8px", color: TEXT2 }}>{row.teamName || "Free Agent"}</td>
+                <td style={{ padding: "8px", color: changedTeam ? GOLD : TEXT2 }}>{row.teamName || "Free Agent"}{changedTeam ? " ⇄" : ""}</td>
                 <td style={{ padding: "8px", color: "#E2B53A" }}>{row.ovr ?? "—"}</td>
                 <td style={{ padding: "8px", color: "#E2B53A", fontWeight: 700 }}>{row.points ?? 0}</td>
                 <td style={{ padding: "8px", color: "#4ADE80" }}>{row.wins ?? 0}</td>
                 <td style={{ padding: "8px", color: BLUE }}>{row.podiums ?? 0}</td>
                 <td style={{ padding: "8px", color: "#C084FC" }}>{row.poles ?? 0}</td>
-                <td style={{ padding: "8px", color: TEXT2 }}>{row.position ? `P${row.position}` : "—"}</td>
+                <td style={{ padding: "8px", color: row.position != null && row.position <= 3 ? GOLD : TEXT2, fontWeight: row.position != null && row.position <= 3 ? 800 : 500 }}>{row.position != null ? `P${row.position}` : "—"}</td>
               </tr>
-            ))}
+            );})}
           </tbody>
         </table>
       </div>
@@ -932,7 +935,7 @@ export default function F1Manager() {
       </div>
 
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", borderBottom: `1px solid ${BORDER}`, background: "linear-gradient(100deg, rgba(17,21,29,0.95), rgba(28,37,55,0.95))", boxShadow: "0 8px 20px rgba(0,0,0,0.22)", flexWrap: "wrap", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", borderBottom: `1px solid ${BORDER}`, background: "linear-gradient(90deg, #0a0f1f, #13233f)", boxShadow: "0 8px 20px rgba(0,0,0,0.22)", flexWrap: "wrap", gap: 12 }}>
           <div style={{ display: "flex", gap: 28, alignItems: "center" }}>
             <TS label="WCC" value={myCP} sub={cRank ? `P${cRank}` : "—"} color={team.color} />
             <TS label={myD1?.name?.split(" ").pop() || "—"} value={myD1 ? (driverPoints[myD1.id] || 0) : "—"} sub={d1Rank ? `P${d1Rank}` : ""} />
@@ -1015,7 +1018,7 @@ function RaceTab({ currentRace, weekendPhase, qualiResults, qualiWeather, raceRe
           <div style={{ fontSize: 11, color: DIM }}>{team.name} — Final Report</div>
         </div>
         {/* Constructor result */}
-        <div style={{ background: BG3, border: `1px solid ${BORDER}`, padding: "16px 20px", marginBottom: 12 }}>
+        <div className="card card-blue" style={{ background: BG3, border: `1px solid ${BORDER}`, padding: "16px 20px", marginBottom: 12 }}>
           <div style={{ fontSize: 9, color: DIM, letterSpacing: 2, marginBottom: 6 }}>CONSTRUCTORS' CHAMPIONSHIP</div>
           <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
             <span style={{ fontSize: 32, fontWeight: 900, color: cPos <= 3 ? "#E2B53A" : TEXT, fontFamily: "'Arial Black', sans-serif" }}>P{cPos || "—"}</span>
@@ -1023,7 +1026,7 @@ function RaceTab({ currentRace, weekendPhase, qualiResults, qualiWeather, raceRe
           </div>
         </div>
         {/* Driver results */}
-        <div style={{ background: BG3, border: `1px solid ${BORDER}`, padding: "16px 20px", marginBottom: 12 }}>
+        <div className="card card-green" style={{ background: BG3, border: `1px solid ${BORDER}`, padding: "16px 20px", marginBottom: 12 }}>
           <div style={{ fontSize: 9, color: DIM, letterSpacing: 2, marginBottom: 8 }}>YOUR DRIVERS</div>
           {myDStandings.map(d => (
             <div key={d.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 0", borderBottom: `1px solid ${BORDER}` }}>
@@ -1037,7 +1040,7 @@ function RaceTab({ currentRace, weekendPhase, qualiResults, qualiWeather, raceRe
         </div>
         {/* Contract warnings */}
         {expiringContracts.length > 0 && (
-          <div style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)", padding: "12px 16px", marginBottom: 12 }}>
+          <div className="card card-red" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)", padding: "12px 16px", marginBottom: 12 }}>
             <div style={{ fontSize: 9, color: "#F87171", letterSpacing: 2, marginBottom: 6 }}>CONTRACT EXPIRIES</div>
             {expiringContracts.map(d => (
               <div key={d.id} style={{ fontSize: 11, color: "#F87171" }}>
@@ -1047,14 +1050,14 @@ function RaceTab({ currentRace, weekendPhase, qualiResults, qualiWeather, raceRe
           </div>
         )}
         {/* Season transition info */}
-        <div style={{ background: BG3, border: `1px solid ${BORDER}`, padding: "12px 16px", marginBottom: 20, fontSize: 11, color: TEXT2, lineHeight: 1.6 }}>
+        <div className="card card-yellow" style={{ background: BG3, border: `1px solid ${BORDER}`, padding: "12px 16px", marginBottom: 20, fontSize: 11, color: TEXT2, lineHeight: 1.6 }}>
           <div style={{ fontSize: 9, color: DIM, letterSpacing: 2, marginBottom: 6 }}>WHAT HAPPENS NEXT</div>
           Advancing to {season + 1}: drivers age by one year, young drivers may improve, veterans may decline. Expired contracts will be released. You'll receive a base budget of $50M plus prize money based on your finish. New prospects will enter the scouting pool.
         </div>
         <div style={{ textAlign: "center" }}>
-          <button onClick={startNextSeason} style={{
-            padding: "14px 48px", background: BLUE, color: "#fff",
-            border: "none", cursor: "pointer", fontSize: 14, fontWeight: 800,
+          <button onClick={startNextSeason} className="btn-primary" style={{
+            padding: "14px 48px", color: "#fff",
+            cursor: "pointer", fontSize: 14, fontWeight: 800,
             letterSpacing: 3, fontFamily: "inherit"
           }}>START {season + 1} SEASON →</button>
         </div>
@@ -1074,7 +1077,7 @@ function RaceTab({ currentRace, weekendPhase, qualiResults, qualiWeather, raceRe
 
   return (
     <div>
-      <div style={{ marginBottom: 24, padding: "20px 24px", background: BG3, border: `1px solid ${BORDER}` }}>
+        <div className="card card-blue" style={{ marginBottom: 24, padding: "20px 24px", background: BG3, border: `1px solid ${BORDER}` }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
           <div>
             <div style={{ fontSize: 10, color: BLUE, letterSpacing: 3, marginBottom: 6, fontWeight: 700 }}>ROUND {raceIndex + 1}</div>
@@ -1092,11 +1095,11 @@ function RaceTab({ currentRace, weekendPhase, qualiResults, qualiWeather, raceRe
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12, marginBottom: 18, alignItems: "stretch" }}>
-        <div style={{ background: BG3, border: `1px solid ${BORDER}`, padding: "18px 20px" }}>
+        <div className="card card-blue" style={{ background: BG3, border: `1px solid ${BORDER}`, padding: "18px 20px" }}>
           {weekendPhase === "preview" ? (
             <div style={{ textAlign: "center", padding: "20px 0" }}>
               <div style={{ fontSize: 11, color: DIM, letterSpacing: 2, marginBottom: 14 }}>LIGHTS OUT AWAITS</div>
-              <button onClick={startQuali} style={{ padding: "14px 48px", background: team.color, color: "#fff", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 800, letterSpacing: 3, fontFamily: "inherit" }}>BEGIN QUALIFYING →</button>
+              <button onClick={startQuali} className="btn-primary" style={{ padding: "14px 48px", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 800, letterSpacing: 3, fontFamily: "inherit" }}>BEGIN QUALIFYING →</button>
             </div>
           ) : (
             <div style={{ fontSize: 11, color: TEXT2, lineHeight: 1.6 }}>
@@ -1140,7 +1143,7 @@ function RaceTab({ currentRace, weekendPhase, qualiResults, qualiWeather, raceRe
           </table>
           {revealCount >= qualiResults.length && (<div style={{ textAlign: "center", marginTop: 28 }}>
             <div style={{ fontSize: 10, color: BLUE, letterSpacing: 2, marginBottom: 4 }}>POLE: {qualiResults[0]?.name} — {qualiResults[0]?.lapTime ? formatTime(qualiResults[0].lapTime) : "—"}</div>
-            <button onClick={startRace} style={{ marginTop: 12, padding: "14px 48px", background: team.color, color: "#fff", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 800, letterSpacing: 3, fontFamily: "inherit" }}>LIGHTS OUT →</button>
+            <button onClick={startRace} className="btn-primary" style={{ marginTop: 12, padding: "14px 48px", color: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 800, letterSpacing: 3, fontFamily: "inherit" }}>LIGHTS OUT →</button>
           </div>)}
         </div>
       )}
@@ -1209,7 +1212,7 @@ function SquadTab({ myDrivers, team, driverPoints, releaseDriver, season, openDr
   return (<div><Sec>YOUR DRIVERS</Sec>
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, maxWidth: 780 }}>
       {myDrivers.map((d, i) => (
-        <div key={d.id} style={{ background: BG3, border: `1px solid ${BORDER}`, padding: 18 }}>
+        <div key={d.id} className="card card-blue" style={{ background: BG3, border: `1px solid ${BORDER}`, padding: 18 }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 14 }}>
             <div><div style={{ fontSize: 9, color: BLUE, letterSpacing: 2, marginBottom: 3 }}>DRIVER {i + 1}</div><div style={{ fontSize: 16, fontWeight: 900, color: "#fff", fontFamily: "'Arial Black', sans-serif" }}><DriverLink driver={d} onOpen={openDriverCard} color="#fff" /></div><div style={{ fontSize: 10, color: DIM, marginTop: 2 }}>Age {d.age} · OVR <span style={{ color: "#E2B53A" }}>{d.ovr}</span></div></div>
             <div style={{ textAlign: "right" }}><div style={{ fontSize: 24, fontWeight: 900, color: team.color, fontFamily: "'Arial Black', sans-serif" }}>{driverPoints[d.id] || 0}</div><div style={{ fontSize: 9, color: DIM }}>PTS</div></div>
