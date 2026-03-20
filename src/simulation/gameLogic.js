@@ -261,11 +261,11 @@ function generateQuali(allDrivers, race, weather, modifiers, teamCars) {
     const pMod = getDriverMod(modifiers, d.id, "pace");
     const cMod = getDriverMod(modifiers, d.id, "consistency");
     const carVal = teamCars?.[d.teamId] ?? 75;
-    const carPerf = (carVal / 100) * 5.6;
-    const driverSkill = (d.ovr / 100) * 2.1
-      + ((d.pace + pMod) / 5) * 0.9
-      + ((d.consistency + cMod) / 5) * 0.5
-      + (isWet ? (d.wet / 5) * 1.3 : 0);
+    const carPerf = (carVal / 100) * 6.5;
+    const driverSkill = (d.ovr / 100) * 1.85
+      + ((d.pace + pMod) / 5) * 0.8
+      + ((d.consistency + cMod) / 5) * 0.42
+      + (isWet ? (d.wet / 5) * 1.15 : 0);
     const luck = (Math.random() - 0.5) * 0.55;
 
     const lapTime = race.baseLap + (isWet ? 8 + Math.random() * 4 : 0)
@@ -289,11 +289,11 @@ function generateRace(qualiResults, race, weather, modifiers, teamCars) {
     const consistency = Math.max(1, Math.min(5, d.consistency + cMod));
     const carVal = teamCars?.[d.teamId] ?? 75;
 
-    const carBase = carVal * 1.62;
-    const driverBase = (d.ovr * 0.82)
-      + (consistency * 4.8)
-      + ((d.pace + pMod) * 2.0)
-      + (isWet ? d.wet * 3.8 : 0);
+    const carBase = carVal * 1.82;
+    const driverBase = (d.ovr * 0.7)
+      + (consistency * 4.2)
+      + ((d.pace + pMod) * 1.6)
+      + (isWet ? d.wet * 3.1 : 0);
     const gridBonus = (qualiResults.length - gp) * 2.25;
     const underdogBonus = Math.max(0, (78 - carVal) * 0.52) + (gp > 12 ? 1.2 : 0);
     const form = trackForm[d.teamId] || 0;
@@ -331,7 +331,8 @@ function aiTransfers(drivers, prospects, teamId, newSeason, transitionNews, driv
     if (t.id === teamId) return; // player controls own contracts
 
     const strength = teamStrength(t.id);
-    const threshold = strength >= 95 ? 92 : strength >= 86 ? 86 : strength >= 78 ? 80 : 74;
+    const carNow = teamCars?.[t.id] ?? TEAMS.find(x => x.id === t.id)?.car ?? 75;
+    const threshold = carNow >= 92 ? 86 : carNow >= 88 ? 82 : strength >= 95 ? 90 : strength >= 86 ? 85 : strength >= 78 ? 79 : 74;
     const expiringIds = new Set(expiringByTeam?.[t.id] || []);
 
     // Team keeps non-expired drivers by default
@@ -340,6 +341,24 @@ function aiTransfers(drivers, prospects, teamId, newSeason, transitionNews, driv
     // Expiring drivers go to market unless re-signed below
     let marketPool = updatedDrivers.filter(d => d.teamId === null);
     let lineup = [...retained];
+
+    // Competitive cars should not keep weak lineups by inertia
+    if (carNow >= 88 && lineup.length > 0) {
+      const cutLine = carNow >= 92 ? 82 : 79;
+      const replaceable = [...lineup].sort((a, b) => driverValue(a) - driverValue(b)).filter(d => d.ovr < cutLine);
+      if (replaceable[0] && maybe(0.8)) {
+        const idx = updatedDrivers.findIndex(x => x.id === replaceable[0].id);
+        if (idx >= 0) {
+          updatedDrivers[idx] = { ...updatedDrivers[idx], teamId: null, contractEnd: null };
+          lineup = lineup.filter(d => d.id !== replaceable[0].id);
+          transitionNews.push(makeNews(
+            `${t.name} Reset Driver Lineup`,
+            `${t.name}'s stronger car programme has triggered a lineup upgrade push ahead of ${newSeason}.`,
+            "Driver", 0
+          ));
+        }
+      }
+    }
 
     // Re-sign top expiring drivers first (strong teams keep stars)
     const expiringDrivers = updatedDrivers
@@ -378,7 +397,7 @@ function aiTransfers(drivers, prospects, teamId, newSeason, transitionNews, driv
       const teamIdn = TEAM_IDENTITIES?.[t.id] || { talent: 0.5 };
       const prospectScore = bestProspect ? (bestProspect.ovr + (bestProspect.pot || bestProspect.ovr) * (0.2 + teamIdn.talent * 0.1)) : -999;
 
-      const pickFA = bestFA && (faScore >= prospectScore + 2 || !bestProspect || strength >= 88);
+      const pickFA = bestFA && (faScore >= prospectScore + (carNow >= 88 ? 0 : 2) || !bestProspect || strength >= 86 || carNow >= 90);
 
       if (pickFA) {
         const idx = updatedDrivers.findIndex(x => x.id === bestFA.id);

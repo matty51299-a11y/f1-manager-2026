@@ -403,16 +403,22 @@ export default function F1Manager() {
       if (newAge <= 23 && pot >= 92) ovrChange += maybe(0.34) ? pick([2, 3]) : 0;
       else if (newAge <= 25 && pot >= 88) ovrChange += maybe(0.22) ? 1 : 0;
       if (pot - d.ovr <= 2 && newAge <= 25) ovrChange += maybe(0.3) ? -1 : 0;
+      if (d.ovr >= 94) ovrChange += pick([-3, -2, -2, -1, 0]);
+      else if (d.ovr >= 92) ovrChange += pick([-2, -1, -1, 0, 0, 1]);
+      else if (d.ovr >= 90) ovrChange += pick([-1, -1, 0, 0, 1]);
       if (perfPts >= 220) ovrChange += 3;
       else if (perfPts >= 130) ovrChange += 2;
       else if (perfPts >= 60) ovrChange += 1;
       else if (perfPts <= 3 && newAge >= 30) ovrChange -= 2;
       else if (perfPts <= 10 && newAge >= 30) ovrChange -= 1;
       if (newAge <= 24 && pot >= 90 && maybe(0.22)) ovrChange += pick([2, 3]);
-      if (newAge >= 34 && maybe(0.22)) ovrChange -= pick([1, 2]);
+      if (newAge >= 31 && maybe(0.2)) ovrChange -= pick([1, 2]);
+      if (newAge >= 34 && maybe(0.3)) ovrChange -= pick([1, 2]);
       if (newAge >= 37 && maybe(0.35)) ovrChange -= pick([1, 2, 3]);
       ovrChange = Math.max(-6, Math.min(6, ovrChange));
-      const newOvr = Math.max(55, Math.min(99, d.ovr + ovrChange));
+      const legacyLongevity = d.ovr >= 93 && perfPts >= 180 && maybe(0.08);
+      const maxAllowed = (newAge <= 24 ? 96 : newAge <= 28 ? 95 : newAge <= 31 ? 94 : newAge <= 34 ? 92 : 90) + (legacyLongevity ? 1 : 0);
+      const newOvr = Math.max(55, Math.min(maxAllowed, d.ovr + ovrChange));
       const newPot = Math.max(newOvr + 1, Math.min(99, pot + (newAge <= 22 && maybe(0.3) ? 1 : 0) - (newAge >= 31 ? 1 : 0)));
       return { ...d, age: newAge, ovr: newOvr, pot: newPot, _ovrDelta: ovrChange };
     });
@@ -452,13 +458,13 @@ export default function F1Manager() {
     const freshProspects = Array.from({ length: 8 }, (_, i) => {
       const isF3 = i < 3;
       const isReserve = i >= 5;
-      const isEliteProspect = maybe(0.14);
+      const isEliteProspect = i === 0 ? maybe(0.35) : maybe(0.18);
       const baseAge = isF3 ? 18 : isReserve ? pick([24, 25, 26, 31]) : 19;
       const series = isF3 ? "F3" : isReserve ? pick(["Reserve", "Veteran", "Free Agent"]) : "F2";
       const baseOvr = isEliteProspect
-        ? pick([69, 70, 71, 72, 73, 74, 75])
+        ? pick([70, 71, 72, 73, 74, 75, 76, 77])
         : isF3 ? 60 + Math.floor(Math.random() * 7) : isReserve ? 70 + Math.floor(Math.random() * 8) : 63 + Math.floor(Math.random() * 9);
-      const potBase = isEliteProspect ? pick([91, 92, 93, 94, 95]) : (isReserve ? 6 : 12) + Math.floor(Math.random() * 8);
+      const potBase = isEliteProspect ? pick([92, 93, 94, 95, 96]) : (isReserve ? 6 : 12) + Math.floor(Math.random() * 8);
       const pot = isEliteProspect ? Math.min(98, potBase + Math.floor(Math.random() * 2)) : Math.min(96, baseOvr + potBase);
       return { name: generateUniqueName(usedGeneratedNames, firstNames, lastNames), age: baseAge, ovr: baseOvr, pace: pick([3, 4, 4, 5]), consistency: pick([2, 3, 4, 4]), wet: pick([2, 3, 4]), series, salary: Math.max(1, Math.round(baseOvr / 28)), pot, id: 200 + newSeason * 10 + i + Math.floor(Math.random() * 500), teamId: null, contractEnd: null };
     });
@@ -619,12 +625,33 @@ export default function F1Manager() {
       next.drivers.filter(d => d.teamId !== null).forEach(d => { nameCounts[d.name] = (nameCounts[d.name] || 0) + 1; });
       const duplicateNames = Object.entries(nameCounts).filter(([, c]) => c > 1).map(([name]) => name);
       const over80 = next.drivers.filter(d => d.ovr >= 80).sort((a, b) => b.ovr - a.ovr);
+      const top10Ratings = [...next.drivers].sort((a, b) => b.ovr - a.ovr).slice(0, 10);
+      const over90 = next.drivers.filter(d => d.ovr >= 90).length;
+      const over92 = next.drivers.filter(d => d.ovr >= 92).length;
+      const over95 = next.drivers.filter(d => d.ovr >= 95).length;
       const sortedCars = Object.entries(next.teamCars || {}).map(([id, rating]) => ({ team: TEAMS.find(t => t.id === id), rating })).sort((a, b) => b.rating - a.rating);
       const zeroPointTeams = buildConstructorStandings(sim.constructorPoints).filter(s => s.pts === 0).map(s => s.team?.name).filter(Boolean);
       const constructorOrder = buildConstructorStandings(sim.constructorPoints).map((s, idx) => `P${idx + 1} ${s.team?.name} (${s.pts})`).join(" · ");
+      const topCarTeams = sortedCars.slice(0, 3);
+      const topTeamDriverAvg = topCarTeams.map(tc => {
+        const td = next.drivers.filter(d => d.teamId === tc.team?.id);
+        const avg = td.length ? (td.reduce((sum, d) => sum + d.ovr, 0) / td.length).toFixed(1) : "—";
+        return `${tc.team?.name}:${avg}`;
+      }).join(", ");
+      const driverTeamAverages = TEAMS.map(t => {
+        const td = next.drivers.filter(d => d.teamId === t.id);
+        return { team: t, avg: td.length ? td.reduce((sum, d) => sum + d.ovr, 0) / td.length : 0 };
+      }).sort((a, b) => b.avg - a.avg);
+      const mismatchTeams = sortedCars
+        .map((carRow, idx) => {
+          const driverRank = driverTeamAverages.findIndex(row => row.team.id === carRow.team?.id) + 1;
+          return { team: carRow.team, carRank: idx + 1, driverRank };
+        })
+        .filter(row => row.driverRank - row.carRank >= 3)
+        .map(row => `${row.team?.name} (car P${row.carRank}, drivers P${row.driverRank})`);
       const summary = makeNews(
         "Dev Sim Summary",
-        `WDC: ${topD?.driver?.name || "—"}. WCC: ${topC?.team?.name || "—"}. Duplicates: ${duplicateNames.length ? duplicateNames.join(", ") : "none"}. OVR80+: ${over80.length}. Car range: ${sortedCars[sortedCars.length - 1]?.rating ?? "—"}-${sortedCars[0]?.rating ?? "—"}. Zero-point teams: ${zeroPointTeams.length ? zeroPointTeams.join(", ") : "none"}. Constructors: ${constructorOrder}.`,
+        `WDC: ${topD?.driver?.name || "—"}. WCC: ${topC?.team?.name || "—"}. Duplicates: ${duplicateNames.length ? duplicateNames.join(", ") : "none"}. Top10 OVR: ${top10Ratings.map(d => `${d.name.split(" ").pop()} ${d.ovr}`).join(", ")}. OVR90+/92+/95+: ${over90}/${over92}/${over95}. OVR80+: ${over80.length}. Top-car team avg OVR: ${topTeamDriverAvg}. Car-driver mismatch: ${mismatchTeams.length ? mismatchTeams.join(", ") : "none"}. Car range: ${sortedCars[sortedCars.length - 1]?.rating ?? "—"}-${sortedCars[0]?.rating ?? "—"}. Zero-point teams: ${zeroPointTeams.length ? zeroPointTeams.join(", ") : "none"}. Constructors: ${constructorOrder}.`,
         "Team",
         0
       );

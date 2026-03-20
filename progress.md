@@ -66,6 +66,13 @@ You run an F1 team across multiple seasons: hire drivers, manage contracts/budge
 - Update this file at the end of each dev session.
 
 ## Change Log
+### v0.1.1
+- Added long-save balancing updates for elite-driver plateau/decline and top-end rating compression.
+- Improved generated-driver uniqueness and stronger top-tier prospect emergence.
+- Rebalanced race/quali car-vs-driver weighting so strong cars matter more over a season.
+- Added more aggressive AI lineup upgrades for teams with competitive cars.
+- Expanded dev sim summary diagnostics (top OVR distribution, team mismatch checks, zero-point teams, constructor order).
+
 ### v0.1.0
 - Initial setup
 - Added baseline race sim loop, scouting, standings, and seasonal flow
