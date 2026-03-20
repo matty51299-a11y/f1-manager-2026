@@ -279,9 +279,9 @@ function generateRace(qualiResults, race, weather, modifiers, teamCars) {
   const isWet = weather.id === "wet" || weather.id === "storm";
   const trackForm = {};
   TEAMS.forEach(t => {
-    trackForm[t.id] = (Math.random() - 0.5) * 1.5 + getTeamMod(modifiers, t.id) * 2.2;
+    trackForm[t.id] = (Math.random() - 0.5) * 2.2 + getTeamMod(modifiers, t.id) * 2.1;
   });
-  const chaotic = Math.random() < 0.05;
+  const chaotic = Math.random() < 0.09;
 
   return qualiResults.map((d, gp) => {
     const cMod = getDriverMod(modifiers, d.id, "consistency");
@@ -289,19 +289,20 @@ function generateRace(qualiResults, race, weather, modifiers, teamCars) {
     const consistency = Math.max(1, Math.min(5, d.consistency + cMod));
     const carVal = teamCars?.[d.teamId] ?? 75;
 
-    const carBase = carVal * 2.0;
+    const carBase = carVal * 1.62;
     const driverBase = (d.ovr * 0.82)
       + (consistency * 4.8)
       + ((d.pace + pMod) * 2.0)
       + (isWet ? d.wet * 3.8 : 0);
-    const gridBonus = (qualiResults.length - gp) * 2.8;
+    const gridBonus = (qualiResults.length - gp) * 2.25;
+    const underdogBonus = Math.max(0, (78 - carVal) * 0.52) + (gp > 12 ? 1.2 : 0);
     const form = trackForm[d.teamId] || 0;
-    const luckRange = Math.max(1.8, (chaotic ? 8 : 3.8) - (consistency - 1) * 0.55);
+    const luckRange = Math.max(2.3, (chaotic ? 10.5 : 5.2) - (consistency - 1) * 0.5);
     const luck = (Math.random() - 0.5) * 2 * luckRange;
-    const dnfChance = Math.max(0.012, 0.032 - consistency * 0.0035 + (gp > 15 ? 0.008 : 0));
+    const dnfChance = Math.max(0.016, 0.038 - consistency * 0.003 + (gp > 15 ? 0.009 : 0) + (isWet ? 0.004 : 0));
     const dnf = Math.random() < dnfChance;
 
-    return { ...d, raceScore: dnf ? -999 : carBase + driverBase + gridBonus + form + luck, dnf, gridPos: gp + 1 };
+    return { ...d, raceScore: dnf ? -999 : carBase + driverBase + gridBonus + underdogBonus + form + luck, dnf, gridPos: gp + 1 };
   }).sort((a, b) => b.raceScore - a.raceScore);
 }
 
@@ -438,7 +439,7 @@ function genMidSeasonReg(teamCars, round) {
     { title: "Suspension Geometry Clampdown", desc: "Stricter interpretation of front suspension geometry" },
   ]);
   const newCars = { ...teamCars };
-  newCars[affected.id] = Math.max(65, Math.min(98, (newCars[affected.id] || 75) - delta));
+  newCars[affected.id] = Math.max(70, Math.min(98, (newCars[affected.id] || 75) - delta));
   newCars[otherAffected.id] = Math.min(98, (newCars[otherAffected.id] || 75) + Math.floor(delta * 0.6));
   const news = [makeNews(
     type.title,
@@ -450,7 +451,7 @@ function genMidSeasonReg(teamCars, round) {
 
 // RIVALRY TRACKING
 function updateRivalry(constructorPoints, driverPoints, team, drivers, prevRivalry) {
-  const cStandings = Object.entries(constructorPoints).map(([id, pts]) => ({ teamId: id, pts })).sort((a, b) => b.pts - a.pts);
+  const cStandings = TEAMS.map(t => ({ teamId: t.id, pts: constructorPoints?.[t.id] || 0 })).sort((a, b) => b.pts - a.pts);
   const myIdx = cStandings.findIndex(s => s.teamId === team.id);
   const myPts = constructorPoints[team.id] || 0;
 
@@ -525,7 +526,7 @@ function updateHistory(history, season, raceResult, driverPoints, constructorPoi
 
 function finaliseSeasonHistory(history, season, driverPoints, constructorPoints, team, drivers) {
   const h = { ...history };
-  const cStandings = Object.entries(constructorPoints).map(([id, pts]) => ({ teamId: id, pts })).sort((a, b) => b.pts - a.pts);
+  const cStandings = TEAMS.map(t => ({ teamId: t.id, pts: constructorPoints?.[t.id] || 0 })).sort((a, b) => b.pts - a.pts);
   const dStandings = Object.entries(driverPoints).map(([id, pts]) => {
     const d = drivers.find(x => x.id === parseInt(id));
     return d ? { driver: d, pts } : null;

@@ -35,6 +35,34 @@ function DashCard({ title, children, accent }) {
 }
 const blankSeasonStats = () => ({ points: 0, wins: 0, podiums: 0, poles: 0, races: 0, finishes: 0, sumFinish: 0, dnfs: 0 });
 const avgFinish = (st) => (st.finishes > 0 ? (st.sumFinish / st.finishes).toFixed(2) : "—");
+const CAR_OVERALL_FLOOR = 70;
+const CAR_ATTR_FLOOR = 68;
+
+function buildConstructorStandings(constructorPoints) {
+  return TEAMS
+    .map(t => ({ team: t, pts: constructorPoints?.[t.id] || 0 }))
+    .sort((a, b) => b.pts - a.pts || ((b.team?.car || 0) - (a.team?.car || 0)) || (a.team?.name || "").localeCompare(b.team?.name || ""));
+}
+
+function generateUniqueName(usedNames, firstPool, lastPool) {
+  for (let i = 0; i < 40; i++) {
+    const full = `${pick(firstPool)} ${pick(lastPool)}`;
+    const key = full.toLowerCase();
+    if (!usedNames.has(key)) {
+      usedNames.add(key);
+      return full;
+    }
+  }
+  const base = `${pick(firstPool)} ${pick(lastPool)}`;
+  let n = 2;
+  let candidate = `${base} ${n}`;
+  while (usedNames.has(candidate.toLowerCase())) {
+    n += 1;
+    candidate = `${base} ${n}`;
+  }
+  usedNames.add(candidate.toLowerCase());
+  return candidate;
+}
 function ensureProfileData(state) {
   const driverSeason = { ...(state.driverSeasonStats || {}) };
   const driverCareer = { ...(state.driverCareer || {}) };
@@ -63,6 +91,7 @@ function enforceTeamRosterValidity(drivers, prospects, newSeason, transitionNews
   const emergencyFirst = ["Ari", "Noel", "Rafa", "Mika", "Theo", "Luca", "Sami", "Nico"];
   const emergencyLast = ["Ward", "Costa", "Bauer", "Khan", "Silva", "Meyer", "Sato", "Marin"];
   let emergencyCounter = 0;
+  const usedNames = new Set([...fixedDrivers, ...availableProspects].map(d => d.name?.toLowerCase()).filter(Boolean));
 
   const driverScore = (d) => (d.ovr * 2) + ((d.pot || d.ovr) * 0.8) + (d.pace * 2) + d.consistency + ((36 - d.age) * 0.12);
   const prospectScore = (d) => (d.ovr * 1.9) + ((d.pot || d.ovr) * 0.9) + (d.pace * 1.8) + d.consistency;
@@ -73,7 +102,7 @@ function enforceTeamRosterValidity(drivers, prospects, newSeason, transitionNews
     emergencyCounter += 1;
     return {
       id: 100000 + (newSeason * 100) + emergencyCounter,
-      name: `${pick(emergencyFirst)} ${pick(emergencyLast)}`,
+      name: generateUniqueName(usedNames, emergencyFirst, emergencyLast),
       age: pick([20, 21, 22, 23, 24]),
       ovr: pick([68, 69, 70, 71, 72, 73]),
       pace: pick([3, 4]),
@@ -248,7 +277,7 @@ function updateProfileStats(prev, raceResult, driverPoints, constructorPoints, s
     });
 
     Object.entries(teamSeason).forEach(([id, stat]) => {
-      const standingsPos = Object.entries(constructorPoints).map(([tid, pts]) => ({ tid, pts })).sort((a, b) => b.pts - a.pts).findIndex(row => row.tid === id) + 1;
+      const standingsPos = buildConstructorStandings(constructorPoints).findIndex(row => row.team?.id === id) + 1;
       const prevHist = teamHistory[id] || { seasons: [] };
       teamHistory[id] = {
         seasons: [...(prevHist.seasons || []), { season, ...stat, position: standingsPos || null }],
@@ -354,7 +383,7 @@ export default function F1Manager() {
   const runOffseason = (p) => {
     const team = p.team;
     const newSeason = p.season + 1;
-    const cStandings = Object.entries(p.constructorPoints).map(([id, pts]) => ({ team: TEAMS.find(t => t.id === id), pts })).sort((a, b) => b.pts - a.pts);
+    const cStandings = buildConstructorStandings(p.constructorPoints);
     const cPos = cStandings.findIndex(s => s.team?.id === team.id) + 1;
 
     const prizeMoney = cPos === 1 ? 15 : cPos === 2 ? 10 : cPos === 3 ? 8 : cPos <= 6 ? 5 : 3;
@@ -371,6 +400,8 @@ export default function F1Manager() {
       else if (newAge <= 33) ovrChange += pick([-3, -2, -1, 0, 0, 1]);
       else ovrChange += pick([-5, -4, -3, -2, -1, 0]);
       if (pot - d.ovr >= 10 && newAge <= 25) ovrChange += maybe(0.5) ? pick([1, 2]) : 0;
+      if (newAge <= 23 && pot >= 92) ovrChange += maybe(0.34) ? pick([2, 3]) : 0;
+      else if (newAge <= 25 && pot >= 88) ovrChange += maybe(0.22) ? 1 : 0;
       if (pot - d.ovr <= 2 && newAge <= 25) ovrChange += maybe(0.3) ? -1 : 0;
       if (perfPts >= 220) ovrChange += 3;
       else if (perfPts >= 130) ovrChange += 2;
@@ -415,16 +446,21 @@ export default function F1Manager() {
       })
       .filter(pr => !(pr.age >= 34 && pr.ovr < 72));
 
-    const namesA = ["Lucas Martín", "Tom Verschoor", "Kacper Nowak", "Yuto Tanaka", "Matteo Rossi", "Elias Berger", "Hugo Petit", "Nils Stenberg", "Sami Al Khatib", "Noah Carlsen"];
-    const namesB = ["André Silva", "Finn McCarthy", "Oscar Lindqvist", "Kai Taniguchi", "Leo Fernández", "Max Schultz", "Ravi Patel", "Cillian Byrne", "Theo Vasseur", "Ivan Petrov"];
+    const firstNames = ["Lucas", "Tom", "Kacper", "Yuto", "Matteo", "Elias", "Hugo", "Nils", "Sami", "Noah", "André", "Finn", "Oscar", "Kai", "Leo", "Max", "Ravi", "Cillian", "Theo", "Ivan", "Milo", "Jakub", "Enzo", "Dani", "Riku", "Nico", "Ari", "Lorenzo"];
+    const lastNames = ["Martín", "Verschoor", "Nowak", "Tanaka", "Rossi", "Berger", "Petit", "Stenberg", "Al Khatib", "Carlsen", "Silva", "McCarthy", "Lindqvist", "Taniguchi", "Fernández", "Schultz", "Patel", "Byrne", "Vasseur", "Petrov", "Costa", "Bauer", "Marin", "Khan", "Sato", "Meyer"];
+    const usedGeneratedNames = new Set([...p.drivers, ...p.prospects].map(d => d.name?.toLowerCase()).filter(Boolean));
     const freshProspects = Array.from({ length: 8 }, (_, i) => {
       const isF3 = i < 3;
       const isReserve = i >= 5;
+      const isEliteProspect = maybe(0.14);
       const baseAge = isF3 ? 18 : isReserve ? pick([24, 25, 26, 31]) : 19;
       const series = isF3 ? "F3" : isReserve ? pick(["Reserve", "Veteran", "Free Agent"]) : "F2";
-      const baseOvr = isF3 ? 60 + Math.floor(Math.random() * 7) : isReserve ? 70 + Math.floor(Math.random() * 8) : 63 + Math.floor(Math.random() * 9);
-      const pot = Math.min(96, baseOvr + (isReserve ? 6 : 12) + Math.floor(Math.random() * 8));
-      return { name: pick(isF3 ? namesA : namesB), age: baseAge, ovr: baseOvr, pace: pick([3, 4]), consistency: pick([2, 3, 4]), wet: pick([2, 3, 4]), series, salary: Math.max(1, Math.round(baseOvr / 28)), pot, id: 200 + newSeason * 10 + i + Math.floor(Math.random() * 500), teamId: null, contractEnd: null };
+      const baseOvr = isEliteProspect
+        ? pick([69, 70, 71, 72, 73, 74, 75])
+        : isF3 ? 60 + Math.floor(Math.random() * 7) : isReserve ? 70 + Math.floor(Math.random() * 8) : 63 + Math.floor(Math.random() * 9);
+      const potBase = isEliteProspect ? pick([91, 92, 93, 94, 95]) : (isReserve ? 6 : 12) + Math.floor(Math.random() * 8);
+      const pot = isEliteProspect ? Math.min(98, potBase + Math.floor(Math.random() * 2)) : Math.min(96, baseOvr + potBase);
+      return { name: generateUniqueName(usedGeneratedNames, firstNames, lastNames), age: baseAge, ovr: baseOvr, pace: pick([3, 4, 4, 5]), consistency: pick([2, 3, 4, 4]), wet: pick([2, 3, 4]), series, salary: Math.max(1, Math.round(baseOvr / 28)), pot, id: 200 + newSeason * 10 + i + Math.floor(Math.random() * 500), teamId: null, contractEnd: null };
     });
     const allProspects = [...refreshedProspects, ...freshProspects];
 
@@ -453,9 +489,9 @@ export default function F1Manager() {
         const rnd = (Math.random() - 0.5) * (2.6 + idn.volatility * 2.6);
         const executionRisk = maybe(0.22 + (1 - idn.dev) * 0.2) ? -pick([1, 2, 3]) : 0;
         const delta = conceptDelta + (idn.dev * 0.75) + finishBonus + (catchup * 1.2) + focusBonus + rnd + executionRisk - elitePenalty;
-        evolved[attr] = Math.max(62, Math.min(99, Math.round((oldProfile[attr] ?? oldProfile.overall) + delta)));
+        evolved[attr] = Math.max(CAR_ATTR_FLOOR, Math.min(99, Math.round((oldProfile[attr] ?? oldProfile.overall) + delta)));
       });
-      evolved.overall = Math.round((evolved.aero + evolved.power + evolved.grip + evolved.tyreWear + evolved.reliability) / 5);
+      evolved.overall = Math.max(CAR_OVERALL_FLOOR, Math.round((evolved.aero + evolved.power + evolved.grip + evolved.tyreWear + evolved.reliability) / 5));
       newCarProfiles[t.id] = evolved;
       newTeamCars[t.id] = evolved.overall;
     });
@@ -571,7 +607,7 @@ export default function F1Manager() {
           teamHistory: profileUpdates.teamHistory,
         };
       }
-      const cStandings = Object.entries(sim.constructorPoints).map(([id, pts]) => ({ team: TEAMS.find(t => t.id === id), pts })).sort((a, b) => b.pts - a.pts);
+      const cStandings = buildConstructorStandings(sim.constructorPoints);
       const dStandings = Object.entries(sim.driverPoints).map(([id, pts]) => { const d = sim.drivers.find(x => x.id === parseInt(id)); return d ? { driver: d, pts } : null; }).filter(Boolean).sort((a, b) => b.pts - a.pts);
       const endNews = genSeasonEnd(sim.team, cStandings, dStandings, RACES_2026.length);
       const finalisedHist = finaliseSeasonHistory(sim.history, sim.season, sim.driverPoints, sim.constructorPoints, sim.team, sim.drivers);
@@ -579,7 +615,19 @@ export default function F1Manager() {
       const topC = cStandings[0];
       sim = { ...sim, news: [...endNews, ...sim.news], history: finalisedHist };
       const next = runOffseason(sim);
-      const summary = makeNews("Dev Sim Summary", `WDC: ${topD?.driver?.name || "—"}. WCC: ${topC?.team?.name || "—"}. Prospects added: 8.`, "Team", 0);
+      const nameCounts = {};
+      next.drivers.filter(d => d.teamId !== null).forEach(d => { nameCounts[d.name] = (nameCounts[d.name] || 0) + 1; });
+      const duplicateNames = Object.entries(nameCounts).filter(([, c]) => c > 1).map(([name]) => name);
+      const over80 = next.drivers.filter(d => d.ovr >= 80).sort((a, b) => b.ovr - a.ovr);
+      const sortedCars = Object.entries(next.teamCars || {}).map(([id, rating]) => ({ team: TEAMS.find(t => t.id === id), rating })).sort((a, b) => b.rating - a.rating);
+      const zeroPointTeams = buildConstructorStandings(sim.constructorPoints).filter(s => s.pts === 0).map(s => s.team?.name).filter(Boolean);
+      const constructorOrder = buildConstructorStandings(sim.constructorPoints).map((s, idx) => `P${idx + 1} ${s.team?.name} (${s.pts})`).join(" · ");
+      const summary = makeNews(
+        "Dev Sim Summary",
+        `WDC: ${topD?.driver?.name || "—"}. WCC: ${topC?.team?.name || "—"}. Duplicates: ${duplicateNames.length ? duplicateNames.join(", ") : "none"}. OVR80+: ${over80.length}. Car range: ${sortedCars[sortedCars.length - 1]?.rating ?? "—"}-${sortedCars[0]?.rating ?? "—"}. Zero-point teams: ${zeroPointTeams.length ? zeroPointTeams.join(", ") : "none"}. Constructors: ${constructorOrder}.`,
+        "Team",
+        0
+      );
       return { ...next, news: [summary, ...next.news], tab: "news" };
     });
   };
@@ -603,7 +651,7 @@ export default function F1Manager() {
   };
 
   const driverStandings = Object.entries(driverPoints).map(([id, pts]) => { const d = drivers.find(x => x.id === parseInt(id)); return d ? { driver: d, pts } : null; }).filter(Boolean).sort((a, b) => b.pts - a.pts);
-  const constructorStandings = Object.entries(constructorPoints).map(([id, pts]) => ({ team: TEAMS.find(t => t.id === id), pts })).sort((a, b) => b.pts - a.pts);
+  const constructorStandings = buildConstructorStandings(constructorPoints);
   const myCP = constructorPoints[team.id] || 0;
   const cRank = constructorStandings.findIndex(s => s.team?.id === team.id) + 1;
   const myD1 = myDrivers[0], myD2 = myDrivers[1];
@@ -1138,7 +1186,7 @@ function ProfilesTab({ drivers, teams, team, driverPoints, constructorPoints, se
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(100px, 1fr))", gap: 8, marginBottom: 14 }}>
               {(() => {
                 const st = tSeason[selectedTeam.id] || blankSeasonStats();
-                const pos = Object.entries(constructorPoints).sort((a,b)=>b[1]-a[1]).findIndex(([id]) => id === selectedTeam.id) + 1;
+                const pos = buildConstructorStandings(constructorPoints).findIndex(row => row.team?.id === selectedTeam.id) + 1;
                 return [
                   ["POSITION", pos || "—", "#fff"],
                   ["POINTS", constructorPoints[selectedTeam.id] || st.points, "#E2B53A"],
