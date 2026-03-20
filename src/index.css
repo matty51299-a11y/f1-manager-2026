@@ -24,3 +24,35 @@ html,
 body {
   background: #0b0d12;
 }
+
+.card {
+  background: linear-gradient(145deg, #0b1220, #0f1b2e);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  box-shadow:
+    0 10px 25px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: all 0.2s ease;
+}
+
+.card:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 14px 35px rgba(0, 0, 0, 0.8),
+    0 0 12px rgba(80, 140, 255, 0.15);
+}
+
+.card-blue { border-left: 3px solid #4f8cff; }
+.card-green { border-left: 3px solid #2ecc71; }
+.card-yellow { border-left: 3px solid #f1c40f; }
+.card-red { border-left: 3px solid #e74c3c; }
+
+.btn-primary {
+  background: linear-gradient(135deg, #4f8cff, #6ea8ff);
+  border: none;
+  box-shadow: 0 4px 12px rgba(79, 140, 255, 0.4);
+}
+
+.btn-primary:hover {
+  filter: brightness(1.1);
+}

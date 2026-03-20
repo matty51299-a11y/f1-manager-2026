@@ -1,9 +1,9 @@
 /* THEME */
-const BG = "#0B0D12", BG2 = "#11151D", BG3 = "#171C26";
-const BORDER = "rgba(255,255,255,0.16)", BORDER2 = "rgba(255,255,255,0.28)";
-const DIM = "rgba(255,255,255,0.62)", DIM2 = "rgba(255,255,255,0.42)", DIM3 = "rgba(255,255,255,0.22)";
-const TEXT = "#F8FAFC", TEXT2 = "rgba(248,250,252,0.88)";
-const GOLD = "#FFD700", BLUE = "#5B8DEF", BLUE2 = "#3B6FD9";
+const BG = "#090D16", BG2 = "#101827", BG3 = "#1A2435";
+const BORDER = "rgba(153, 187, 255, 0.2)", BORDER2 = "rgba(168, 200, 255, 0.36)";
+const DIM = "rgba(214,226,242,0.78)", DIM2 = "#9fb3c8", DIM3 = "rgba(159,179,200,0.42)";
+const TEXT = "#F5F9FF", TEXT2 = "rgba(241,247,255,0.9)";
+const GOLD = "#FFD76B", BLUE = "#6EA7FF", BLUE2 = "#4D87F2";
 
 const CAT_COLORS = {
   Driver: { bg: "rgba(59,130,246,0.3)", fg: "#60A5FA" },
