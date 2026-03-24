@@ -283,7 +283,7 @@ function generateRace(qualiResults, race, weather, modifiers, teamCars) {
     const lowerTeamVariance = car <= 80 ? 1.3 : car <= 84 ? 0.8 : 0.3;
     trackForm[t.id] = (Math.random() - 0.5) * (2.2 + lowerTeamVariance) + getTeamMod(modifiers, t.id) * 2.1;
   });
-  const chaotic = Math.random() < 0.15;
+  const chaotic = Math.random() < 0.2;
 
   return qualiResults.map((d, gp) => {
     const cMod = getDriverMod(modifiers, d.id, "consistency");
@@ -297,12 +297,13 @@ function generateRace(qualiResults, race, weather, modifiers, teamCars) {
       + ((d.pace + pMod) * 1.6)
       + (isWet ? d.wet * 3.1 : 0);
     const gridBonus = (qualiResults.length - gp) * 2.25;
-    const underdogBonus = Math.max(0, (82 - carVal) * 0.72) + (gp > 12 ? 1.9 : 0);
-    const strategySwing = ((Math.random() - 0.5) * 2) * (carVal <= 82 ? 2.8 : 1.5);
+    const underdogBonus = Math.max(0, (83 - carVal) * 0.78) + (gp > 12 ? 2.2 : 0);
+    const strategySwing = ((Math.random() - 0.5) * 2) * (carVal <= 82 ? 3.4 : 1.8);
     const form = trackForm[d.teamId] || 0;
-    const luckRange = Math.max(2.3, (chaotic ? 10.5 : 5.2) - (consistency - 1) * 0.5);
+    const luckRange = Math.max(2.5, (chaotic ? 11.6 : 5.9) - (consistency - 1) * 0.45);
     const luck = (Math.random() - 0.5) * 2 * luckRange;
-    const dnfChance = Math.max(0.023, 0.046 - consistency * 0.003 + (gp > 15 ? 0.012 : 0) + (isWet ? 0.006 : 0));
+    const reliabilityStress = carVal <= 76 ? 0.012 : carVal <= 80 ? 0.008 : carVal <= 84 ? 0.004 : 0;
+    const dnfChance = Math.max(0.026, 0.05 - consistency * 0.003 + reliabilityStress + (gp > 15 ? 0.013 : 0) + (isWet ? 0.008 : 0));
     const dnf = Math.random() < dnfChance;
 
     return { ...d, raceScore: dnf ? -999 : carBase + driverBase + gridBonus + underdogBonus + strategySwing + form + luck, dnf, gridPos: gp + 1 };
@@ -316,7 +317,20 @@ function generateRace(qualiResults, race, weather, modifiers, teamCars) {
 function aiTransfers(drivers, prospects, teamId, newSeason, transitionNews, driverPoints = {}, constructorPoints = {}, teamCars = {}, expiringByTeam = {}) {
   const updatedDrivers = drivers.map(d => ({ ...d }));
   let availableProspects = [...prospects];
-  const transferStats = { expiringContracts: 0, eligibleRenewals: 0, renewalAttempts: 0, acceptedRenewals: 0, replacementChoices: 0 };
+  const transferStats = {
+    expiringContracts: 0,
+    eligibleRenewals: 0,
+    renewalAttempts: 0,
+    acceptedRenewals: 0,
+    skippedRenewals: 0,
+    skippedRenewalReasons: {},
+    replacementChoices: 0,
+  };
+
+  const addSkippedRenewalReason = (reason) => {
+    transferStats.skippedRenewalReasons[reason] = (transferStats.skippedRenewalReasons[reason] || 0) + 1;
+    transferStats.skippedRenewals += 1;
+  };
 
   const teamStrength = (tid) => {
     const cPts = constructorPoints?.[tid] || 0;
@@ -342,7 +356,7 @@ function aiTransfers(drivers, prospects, teamId, newSeason, transitionNews, driv
     const expiringIds = new Set(expiringByTeam?.[t.id] || []);
     transferStats.expiringContracts += expiringIds.size;
 
-    // Team keeps non-expired drivers by default
+    // Team keeps currently contracted drivers by default
     const retained = updatedDrivers.filter(d => d.teamId === t.id);
 
     // Expiring drivers go to market unless re-signed below
@@ -353,8 +367,10 @@ function aiTransfers(drivers, prospects, teamId, newSeason, transitionNews, driv
     if (lineup.length > 0) {
       const cutLine = carNow >= 92 ? 83 : carNow >= 88 ? 81 : carNow >= 82 ? 79 : 77;
       const replaceable = [...lineup].sort((a, b) => driverValue(a) - driverValue(b)).filter(d => d.ovr < cutLine || (d.ovr < 80 && (d.lowOvrSeasons || 0) >= 1) || ((d.lowOvrSeasons || 0) >= 2));
-      const replaceChance = carNow >= 90 ? 0.8 : carNow >= 84 ? 0.55 : 0.35;
-      if (replaceable[0] && maybe(replaceChance)) {
+      const lowestIncumbent = replaceable[0];
+      const forceReplace = lowestIncumbent && (lowestIncumbent.ovr < 70 || (lowestIncumbent.ovr < 75 && (lowestIncumbent.lowOvrSeasons || 0) >= 1));
+      const replaceChance = forceReplace ? 0.98 : (carNow >= 90 ? 0.85 : carNow >= 84 ? 0.6 : 0.42);
+      if (lowestIncumbent && maybe(replaceChance)) {
         const idx = updatedDrivers.findIndex(x => x.id === replaceable[0].id);
         if (idx >= 0) {
           updatedDrivers[idx] = { ...updatedDrivers[idx], teamId: null, contractEnd: null };
@@ -368,7 +384,7 @@ function aiTransfers(drivers, prospects, teamId, newSeason, transitionNews, driv
       }
     }
 
-    // Re-sign top expiring drivers first (strong teams keep stars)
+    // Phase 1: Re-sign expiring drivers before any external seat fill
     const expiringDrivers = (expiringByTeam?.[t.id] || [])
       .map(id => drivers.find(d => d.id === id) || updatedDrivers.find(d => d.id === id))
       .filter(Boolean)
@@ -382,6 +398,12 @@ function aiTransfers(drivers, prospects, teamId, newSeason, transitionNews, driv
       const disqualified = lineup.length >= 2 && !lineup.some(x => x.id === d.id);
       if (disqualified) {
         transferStats.replacementChoices += 1;
+        addSkippedRenewalReason("team forced replacement due to major performance mismatch");
+        transitionNews.push(makeNews(
+          `Renewal Skipped: ${d.name}`,
+          `${t.name} skipped a renewal attempt for ${d.name} because the seat was already committed to stronger retained options.`,
+          "Team", 0
+        ));
         return;
       }
       const value = driverValue(d);
@@ -391,15 +413,26 @@ function aiTransfers(drivers, prospects, teamId, newSeason, transitionNews, driv
       const replacementGap = bestMarket - value;
       const fitScore = d.ovr - (carNow >= 92 ? 84 : carNow >= 88 ? 81 : 78);
       const continuityBonus = retained.some(r => r.id === d.id) ? 0.12 : 0;
-      let resignChance = 0.64 + continuityBonus;
-      if (value >= threshold) resignChance += 0.2;
+      const expectedSalary = Math.max(2, Math.round((d.ovr - 62) / 6));
+      const salaryMismatch = Math.max(0, (d.salary || expectedSalary) - expectedSalary);
+      const marketPull = Math.max(0, replacementGap - 2);
+      const ambitionMismatch = carNow <= 79 && d.ovr >= 86 ? 0.08 : carNow <= 82 && d.ovr >= 88 ? 0.05 : 0;
+      const carUpgradeExpendable = carNow >= 90 && d.ovr <= 82 && replacementGap > 2;
+      let resignChance = 0.56 + continuityBonus;
+      if (value >= threshold) resignChance += 0.18;
       if (perfPts >= 100) resignChance += 0.15;
       else if (perfPts >= 50) resignChance += 0.08;
       if (fitScore >= 2) resignChance += 0.08;
-      if (replacementGap > 6) resignChance -= 0.16;
-      if (d.ovr < 80) resignChance -= (d.lowOvrSeasons || 0) >= 2 ? 0.38 : 0.16;
+      if (replacementGap > 6) resignChance -= 0.2;
+      if (marketPull > 0) resignChance -= Math.min(0.2, marketPull * 0.03);
+      if (salaryMismatch > 0) resignChance -= Math.min(0.18, salaryMismatch * 0.04);
+      if (ambitionMismatch > 0) resignChance -= ambitionMismatch + 0.03;
+      if (carUpgradeExpendable) resignChance -= 0.14;
+      if (d.ovr < 80) resignChance -= (d.lowOvrSeasons || 0) >= 2 ? 0.45 : 0.2;
+      if (d.ovr < 75) resignChance -= 0.24;
       if (decline <= -2) resignChance -= 0.12;
-      if (carNow >= 90 && d.ovr < 82) resignChance -= 0.14;
+      if (decline <= -4 && d.age >= 34) resignChance -= 0.36;
+      if (carNow >= 90 && d.ovr < 82) resignChance -= 0.17;
       resignChance = Math.max(0.05, Math.min(0.95, resignChance));
       const shouldResign = maybe(resignChance) || value >= threshold + 7;
       if (shouldResign) {
@@ -417,20 +450,40 @@ function aiTransfers(drivers, prospects, teamId, newSeason, transitionNews, driv
         }
       } else {
         transferStats.replacementChoices += 1;
+        const skipReason =
+          (decline <= -4 && d.age >= 34)
+            ? "driver declined automatically due to age/decline threshold"
+            : (salaryMismatch > 2)
+              ? "contract logic disqualified renewal for a specific rule"
+              : (ambitionMismatch > 0 || carUpgradeExpendable)
+                ? "team forced replacement due to major performance mismatch"
+            : (replacementGap > 6)
+              ? "team forced replacement due to major performance mismatch"
+              : "contract logic disqualified renewal for a specific rule";
+        addSkippedRenewalReason(skipReason);
+        transitionNews.push(makeNews(
+          `Renewal Skipped: ${d.name}`,
+          `${t.name} moved on from ${d.name} (${skipReason}).`,
+          "Team", 0
+        ));
       }
     });
     if (expiringDrivers.length > 0 && teamRenewalAttempts === 0) {
       transitionNews.push(makeNews("Renewal Logic Warning", `${t.name} had expiring contracts but recorded zero renewal attempts.`, "Team", 0));
     }
+    if (expiringDrivers.length > 0 && teamRenewalAttempts === 0) {
+      addSkippedRenewalReason("contract logic disqualified renewal for a specific rule");
+    }
 
-    // Fill remaining seats from best available options weighted by team strength
+    // Phase 2: Fill remaining open seats from free agency/prospects only after renewal phase
     while (lineup.length < 2) {
       marketPool = updatedDrivers.filter(d => d.teamId === null).sort((a, b) => driverValue(b) - driverValue(a));
       const prospectPool = [...availableProspects].sort((a, b) => (b.ovr + (b.pot || b.ovr) * 0.2) - (a.ovr + (a.pot || a.ovr) * 0.2));
-      const minFaOvr = carNow >= 92 ? 82 : carNow >= 88 ? 80 : carNow >= 82 ? 78 : 76;
+      const minFaOvr = carNow >= 92 ? 83 : carNow >= 88 ? 80 : carNow >= 82 ? 79 : 78;
       const preferredFA = marketPool.filter(d => d.ovr >= minFaOvr);
+      const fallbackFA = marketPool.find(d => d.ovr >= 75);
 
-      const bestFA = preferredFA[0] || marketPool[0];
+      const bestFA = preferredFA[0] || fallbackFA;
       const bestProspect = prospectPool[0];
       if (!bestFA && !bestProspect) break;
 
@@ -588,25 +641,44 @@ function updateHistory(history, season, raceResult, driverPoints, constructorPoi
 
 function finaliseSeasonHistory(history, season, driverPoints, constructorPoints, team, drivers) {
   const h = { ...history };
+  if (!h.seasons) h.seasons = [];
+  if (!h.champions) h.champions = [];
   const cStandings = TEAMS.map(t => ({ teamId: t.id, pts: constructorPoints?.[t.id] || 0 })).sort((a, b) => b.pts - a.pts);
-  const dStandings = Object.entries(driverPoints).map(([id, pts]) => {
-    const d = drivers.find(x => x.id === parseInt(id));
-    return d ? { driver: d, pts } : null;
-  }).filter(Boolean).sort((a, b) => b.pts - a.pts);
+  const dStandings = drivers
+    .filter(d => d.teamId !== null)
+    .map(d => ({ driver: d, pts: driverPoints[d.id] || 0 }))
+    .sort((a, b) => (b.pts - a.pts) || ((b.driver?.ovr || 0) - (a.driver?.ovr || 0)) || (a.driver?.name || "").localeCompare(b.driver?.name || ""));
 
   const cPos = cStandings.findIndex(s => s.teamId === team.id) + 1;
   const cPts = constructorPoints[team.id] || 0;
   const myDriverResults = drivers.filter(d => d.teamId === team.id).map(d => {
-    const pos = dStandings.findIndex(s => s.driver?.id === d.id) + 1;
+    const rankIdx = dStandings.findIndex(s => s.driver?.id === d.id);
+    const pos = rankIdx >= 0 ? rankIdx + 1 : null;
     return { name: d.name, pos, pts: driverPoints[d.id] || 0 };
   });
-  const bestWDC = myDriverResults.length > 0 ? Math.min(...myDriverResults.map(d => d.pos)) : 99;
+  const bestWDC = myDriverResults.length > 0 ? Math.min(...myDriverResults.map(d => d.pos || 99)) : 99;
+  const wdcChampion = dStandings[0]?.driver;
+  const wccChampionTeam = TEAMS.find(t => t.id === cStandings[0]?.teamId);
 
   if (cPos === 1) h.titles.wcc++;
   if (bestWDC === 1) h.titles.wdc++;
   h.totalPoints += cPts;
 
-  h.seasons.push({ year: season, wccPos: cPos, wccPts: cPts, drivers: myDriverResults, wins: h.totalWins, podiums: h.totalPodiums });
+  h.seasons.push({
+    year: season,
+    wccPos: cPos,
+    wccPts: cPts,
+    drivers: myDriverResults,
+    wins: h.totalWins,
+    podiums: h.totalPodiums,
+    wdcWinner: wdcChampion ? { name: wdcChampion.name, teamId: wdcChampion.teamId, pts: dStandings[0]?.pts || 0 } : null,
+    wccWinner: wccChampionTeam ? { name: wccChampionTeam.name, teamId: wccChampionTeam.id, pts: cStandings[0]?.pts || 0 } : null,
+  });
+  h.champions.push({
+    year: season,
+    wdc: wdcChampion ? { name: wdcChampion.name, teamId: wdcChampion.teamId, pts: dStandings[0]?.pts || 0 } : null,
+    wcc: wccChampionTeam ? { name: wccChampionTeam.name, teamId: wccChampionTeam.id, pts: cStandings[0]?.pts || 0 } : null,
+  });
   return h;
 }
 
@@ -634,10 +706,10 @@ function initGame(pid) {
   };
   const generatedMarketDrivers = Array.from({ length: extraNeeded }, (_, i) => {
     const tierRoll = Math.random();
-    const topReady = i < 8 || tierRoll < 0.1;
-    const upperMid = !topReady && (i < 24 || tierRoll < 0.38);
-    const ovr = topReady ? pick([80, 81, 82, 83]) : upperMid ? pick([76, 77, 78, 79, 80]) : pick([68, 69, 70, 71, 72, 73, 74, 75, 76]);
-    const pot = topReady ? pick([88, 89, 90, 91, 92, 93]) : upperMid ? pick([82, 83, 84, 85, 86, 87, 88]) : pick([74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84]);
+    const topReady = i < 4 || tierRoll < 0.06;
+    const upperMid = !topReady && (i < 18 || tierRoll < 0.32);
+    const ovr = topReady ? pick([78, 79, 80, 81]) : upperMid ? pick([74, 75, 76, 77, 78, 79]) : pick([66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76]);
+    const pot = topReady ? pick([87, 88, 89, 90, 91, 92]) : upperMid ? pick([81, 82, 83, 84, 85, 86, 87]) : pick([73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83]);
     const age = topReady ? pick([19, 20, 21, 22, 23]) : upperMid ? pick([20, 21, 22, 23, 24, 25]) : pick([18, 19, 20, 21, 22, 23, 24, 25, 26, 27]);
     const series = topReady ? pick(["F2", "Reserve", "Free Agent"]) : upperMid ? pick(["F2", "Reserve", "IndyCar"]) : pick(["F3", "F2", "Reserve", "Free Agent"]);
     return {
