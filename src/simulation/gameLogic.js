@@ -692,8 +692,8 @@ function initGame(pid) {
   const baseProspects = PROSPECTS.map((p, i) => ({ ...p, id: 100 + i, teamId: null, contractEnd: null }));
   const totalTargetDrivers = 100;
   const extraNeeded = Math.max(0, totalTargetDrivers - drivers.length - baseProspects.length);
-  const firstNames = ["Luca", "Enzo", "Noah", "Mika", "Theo", "Riku", "Ivan", "Sami", "Yuki", "Ari", "Leo", "Oscar", "Dani", "Nico", "Maxim", "Rafael", "Tom", "Kai", "Elias", "Adam"];
-  const lastNames = ["Costa", "Berger", "Tanaka", "Nowak", "Silva", "Meyer", "Sato", "Marin", "Patel", "Byrne", "Schultz", "Lindqvist", "Fernandez", "Petrov", "Bauer", "Khan", "Rossi", "Vasseur", "Carlsen", "Stenberg"];
+  const firstNames = ["Luca", "Enzo", "Noah", "Mika", "Theo", "Riku", "Ivan", "Sami", "Yuki", "Ari", "Leo", "Oscar", "Dani", "Nico", "Maxim", "Rafael", "Tom", "Kai", "Elias", "Adam", "Mateo", "Pablo", "Jonas", "Alessio", "Victor", "Tobias", "Arman", "Marek", "Damien", "Sacha", "Natan", "Yann", "Ilya", "Kimi", "Jules"];
+  const lastNames = ["Costa", "Berger", "Tanaka", "Nowak", "Silva", "Meyer", "Sato", "Marin", "Patel", "Byrne", "Schultz", "Lindqvist", "Fernandez", "Petrov", "Bauer", "Khan", "Rossi", "Vasseur", "Carlsen", "Stenberg", "Navarro", "Moretti", "Volkov", "Ibrahim", "Kowalski", "Bennett", "Haddad", "Larsen", "Bianchi", "Serrano", "Adebayo", "Mendes", "Rinaldi", "Pavlov", "Novak"];
   const usedNames = new Set([...drivers, ...baseProspects].map(d => d.name.toLowerCase()));
   const makeUniqueName = () => {
     for (let i = 0; i < 30; i++) {

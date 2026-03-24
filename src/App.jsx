@@ -147,8 +147,8 @@ function nextAvailableId(existingDrivers = [], existingProspects = [], floor = 2
 function ensureValidTeamRosters(drivers, prospects, newSeason, transitionNews = []) {
   const fixedDrivers = drivers.map(d => ({ ...d }));
   let availableProspects = [...prospects];
-  const emergencyFirst = ["Ari", "Noel", "Rafa", "Mika", "Theo", "Luca", "Sami", "Nico"];
-  const emergencyLast = ["Ward", "Costa", "Bauer", "Khan", "Silva", "Meyer", "Sato", "Marin"];
+  const emergencyFirst = ["Ari", "Noel", "Rafa", "Mika", "Theo", "Luca", "Sami", "Nico", "Mateo", "Jules", "Isak", "Roman", "Dario", "Kimi", "Yannis", "Ilya", "Otto", "Emil", "Raul", "Soren"];
+  const emergencyLast = ["Ward", "Costa", "Bauer", "Khan", "Silva", "Meyer", "Sato", "Marin", "Novak", "Pereira", "Kowalski", "Haddad", "Volkov", "Bennett", "Moretti", "Ibrahim", "Larsen", "Navarro", "Bianchi", "Serrano"];
   let emergencyGenerated = 0;
   const usedNames = new Set([...fixedDrivers, ...availableProspects].map(d => d.name?.toLowerCase()).filter(Boolean));
   let nextId = nextAvailableId(fixedDrivers, availableProspects, 100000 + (newSeason * 100));
@@ -567,8 +567,8 @@ export default function F1Manager() {
       })
       .filter(pr => !(pr.age >= 34 && pr.ovr < 72));
 
-    const firstNames = ["Lucas", "Tom", "Kacper", "Yuto", "Matteo", "Elias", "Hugo", "Nils", "Sami", "Noah", "André", "Finn", "Oscar", "Kai", "Leo", "Max", "Ravi", "Cillian", "Theo", "Ivan", "Milo", "Jakub", "Enzo", "Dani", "Riku", "Nico", "Ari", "Lorenzo"];
-    const lastNames = ["Martín", "Verschoor", "Nowak", "Tanaka", "Rossi", "Berger", "Petit", "Stenberg", "Al Khatib", "Carlsen", "Silva", "McCarthy", "Lindqvist", "Taniguchi", "Fernández", "Schultz", "Patel", "Byrne", "Vasseur", "Petrov", "Costa", "Bauer", "Marin", "Khan", "Sato", "Meyer"];
+    const firstNames = ["Lucas", "Tom", "Kacper", "Yuto", "Matteo", "Elias", "Hugo", "Nils", "Sami", "Noah", "André", "Finn", "Oscar", "Kai", "Leo", "Max", "Ravi", "Cillian", "Theo", "Ivan", "Milo", "Jakub", "Enzo", "Dani", "Riku", "Nico", "Ari", "Lorenzo", "Miguel", "Pablo", "Jonas", "Alessio", "Victor", "Yann", "Tobias", "Arman", "Marek", "Damien", "Sacha", "Natan"];
+    const lastNames = ["Martín", "Verschoor", "Nowak", "Tanaka", "Rossi", "Berger", "Petit", "Stenberg", "Al Khatib", "Carlsen", "Silva", "McCarthy", "Lindqvist", "Taniguchi", "Fernández", "Schultz", "Patel", "Byrne", "Vasseur", "Petrov", "Costa", "Bauer", "Marin", "Khan", "Sato", "Meyer", "Navarro", "Moretti", "Volkov", "Ibrahim", "Kowalski", "Bennett", "Haddad", "Larsen", "Bianchi", "Serrano", "Adebayo", "Mendes", "Rinaldi", "Pavlov"];
     const usedGeneratedNames = new Set([...p.drivers, ...p.prospects].map(d => d.name?.toLowerCase()).filter(Boolean));
     let nextProspectId = nextAvailableId(processedDrivers, refreshedProspects, 2000 + newSeason);
     const freshProspects = Array.from({ length: 8 }, (_, i) => {
@@ -899,6 +899,29 @@ export default function F1Manager() {
     });
   };
 
+  const reSignDriver = (dr) => {
+    if (dr.teamId !== team.id) return;
+    const extensionYears = dr.ovr >= 88 ? 3 : dr.ovr >= 82 ? 2 : 1;
+    const signingBonus = Math.max(2, Math.round((dr.salary || 2) * 0.7));
+    if (budget < signingBonus) return;
+    setGame(p => {
+      const idx = p.drivers.findIndex(d => d.id === dr.id && d.teamId === p.team.id);
+      if (idx < 0) return p;
+      const current = p.drivers[idx];
+      const baseEnd = Math.max(p.season, current.contractEnd || p.season);
+      const newEnd = baseEnd + extensionYears;
+      const updated = [...p.drivers];
+      updated[idx] = { ...current, contractEnd: newEnd };
+      const newsItem = makeNews(
+        `${p.team.name} Re-Sign ${current.name}`,
+        `${p.team.name} have renewed ${current.name} through ${newEnd} on a ${extensionYears}-year extension (signing bonus: $${signingBonus}M).`,
+        "Driver",
+        p.raceIndex + 1
+      );
+      return { ...p, drivers: updated, budget: Math.max(0, p.budget - signingBonus), news: [newsItem, ...p.news] };
+    });
+  };
+
   const driverStandings = Object.entries(driverPoints).map(([id, pts]) => { const d = drivers.find(x => x.id === parseInt(id)); return d ? { driver: d, pts } : null; }).filter(Boolean).sort((a, b) => b.pts - a.pts);
   const constructorStandings = buildConstructorStandings(constructorPoints);
   const myCP = constructorPoints[team.id] || 0;
@@ -952,7 +975,7 @@ export default function F1Manager() {
           {tab === "scouting" && <ScoutingTab {...{ prospects, budget, signProspect, myDrivers, team, openDriverCard: setDriverCardId }} />}
           {tab === "grid" && <GridTab {...{ drivers, driverPoints, team, season, teamCars, teamCarProfiles, openDriverCard: setDriverCardId }} />}
           {tab === "profiles" && <ProfilesTab {...{ drivers, teams: TEAMS, team, driverPoints, constructorPoints, season, driverSeasonStats, driverCareer, teamSeasonStats, teamHistory, teamCars }} />}
-          {tab === "contracts" && <ContractsTab {...{ drivers, season, team, driverPoints, openDriverCard: setDriverCardId }} />}
+          {tab === "contracts" && <ContractsTab {...{ drivers, season, team, budget, driverPoints, openDriverCard: setDriverCardId, reSignDriver }} />}
           {tab === "standings" && <StandingsTab {...{ driverStandings, constructorStandings, team, openDriverCard: setDriverCardId }} />}
           {tab === "calendar" && <CalendarTab {...{ raceIndex, raceResults, team, season }} />}
           {tab === "history" && <HistoryTab history={history} team={team} rivalry={rivalry} />}
@@ -1511,7 +1534,7 @@ function ProfilesTab({ drivers, teams, team, driverPoints, constructorPoints, se
   );
 }
 
-function ContractsTab({ drivers, season, team, driverPoints, openDriverCard }) {
+function ContractsTab({ drivers, season, team, budget, driverPoints, openDriverCard, reSignDriver }) {
   const freeAgents = drivers.filter(d => d.teamId === null).sort((a, b) => b.ovr - a.ovr);
   const contracted = drivers.filter(d => d.teamId !== null).sort((a, b) => (a.contractEnd || 0) - (b.contractEnd || 0));
 
@@ -1520,19 +1543,34 @@ function ContractsTab({ drivers, season, team, driverPoints, openDriverCard }) {
       <div>
         <Sec>CONTRACT STATUS</Sec>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead><tr style={{ borderBottom: `1px solid ${BORDER2}` }}>{["DRIVER", "TEAM", "END", "YRS", "SAL"].map(h => <th key={h} style={{ textAlign: "left", padding: "6px 8px", fontSize: 8, color: DIM, letterSpacing: 2 }}>{h}</th>)}</tr></thead>
+          <thead><tr style={{ borderBottom: `1px solid ${BORDER2}` }}>{["DRIVER", "TEAM", "END", "YRS", "SAL", "ACTION"].map(h => <th key={h} style={{ textAlign: "left", padding: "6px 8px", fontSize: 8, color: DIM, letterSpacing: 2 }}>{h}</th>)}</tr></thead>
           <tbody>
             {contracted.map(d => {
               const t = TEAMS.find(x => x.id === d.teamId);
               const yrs = d.contractEnd ? Math.max(0, d.contractEnd - season) : 0;
               const danger = yrs <= 1;
               const mine = d.teamId === team.id;
+              const canRenew = mine;
+              const renewCost = Math.max(2, Math.round((d.salary || 2) * 0.7));
               return <tr key={d.id} style={{ borderBottom: `1px solid ${BORDER}`, background: mine ? `${team.color}1f` : "transparent" }}>
                 <td style={{ padding: "8px", color: mine ? "#fff" : TEXT, fontWeight: mine ? 700 : 500 }}><DriverLink driver={d} onOpen={openDriverCard} color={mine ? "#fff" : TEXT} weight={mine ? 700 : 500} /></td>
                 <td style={{ padding: "8px", color: TEXT2, fontSize: 11 }}>{t?.name}</td>
                 <td style={{ padding: "8px", color: danger ? "#F87171" : "#4ADE80", fontWeight: 700 }}>{d.contractEnd}</td>
                 <td style={{ padding: "8px", color: danger ? "#F87171" : DIM }}>{yrs}</td>
                 <td style={{ padding: "8px", color: "#E2B53A" }}>${d.salary}M</td>
+                <td style={{ padding: "8px" }}>
+                  {canRenew ? (
+                    <button
+                      onClick={() => reSignDriver(d)}
+                      disabled={budget < renewCost}
+                      className="btn-primary"
+                      style={{ padding: "4px 8px", fontSize: 9, letterSpacing: 1, opacity: budget < renewCost ? 0.55 : 1 }}
+                      title={budget < renewCost ? `Need $${renewCost}M signing bonus` : `Re-sign for $${renewCost}M signing bonus`}
+                    >
+                      RE-SIGN
+                    </button>
+                  ) : <span style={{ color: DIM3, fontSize: 10 }}>—</span>}
+                </td>
               </tr>;
             })}
           </tbody>
