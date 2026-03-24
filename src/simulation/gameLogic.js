@@ -706,10 +706,10 @@ function initGame(pid) {
   };
   const generatedMarketDrivers = Array.from({ length: extraNeeded }, (_, i) => {
     const tierRoll = Math.random();
-    const topReady = i < 8 || tierRoll < 0.1;
-    const upperMid = !topReady && (i < 24 || tierRoll < 0.38);
-    const ovr = topReady ? pick([80, 81, 82, 83]) : upperMid ? pick([76, 77, 78, 79, 80]) : pick([68, 69, 70, 71, 72, 73, 74, 75, 76]);
-    const pot = topReady ? pick([88, 89, 90, 91, 92, 93]) : upperMid ? pick([82, 83, 84, 85, 86, 87, 88]) : pick([74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84]);
+    const topReady = i < 4 || tierRoll < 0.06;
+    const upperMid = !topReady && (i < 18 || tierRoll < 0.32);
+    const ovr = topReady ? pick([78, 79, 80, 81]) : upperMid ? pick([74, 75, 76, 77, 78, 79]) : pick([66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76]);
+    const pot = topReady ? pick([87, 88, 89, 90, 91, 92]) : upperMid ? pick([81, 82, 83, 84, 85, 86, 87]) : pick([73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83]);
     const age = topReady ? pick([19, 20, 21, 22, 23]) : upperMid ? pick([20, 21, 22, 23, 24, 25]) : pick([18, 19, 20, 21, 22, 23, 24, 25, 26, 27]);
     const series = topReady ? pick(["F2", "Reserve", "Free Agent"]) : upperMid ? pick(["F2", "Reserve", "IndyCar"]) : pick(["F3", "F2", "Reserve", "Free Agent"]);
     return {

@@ -136,14 +136,22 @@ function ratedProspectToDriver(pr, teamId, newSeason) {
   return { ...pr, teamId, contractEnd: newSeason + years };
 }
 
+function nextAvailableId(existingDrivers = [], existingProspects = [], floor = 2000) {
+  const ids = [...existingDrivers, ...existingProspects]
+    .map(d => Number(d?.id))
+    .filter(Number.isFinite);
+  const maxSeen = ids.length ? Math.max(...ids) : floor;
+  return Math.max(floor, maxSeen + 1);
+}
+
 function ensureValidTeamRosters(drivers, prospects, newSeason, transitionNews = []) {
   const fixedDrivers = drivers.map(d => ({ ...d }));
   let availableProspects = [...prospects];
   const emergencyFirst = ["Ari", "Noel", "Rafa", "Mika", "Theo", "Luca", "Sami", "Nico"];
   const emergencyLast = ["Ward", "Costa", "Bauer", "Khan", "Silva", "Meyer", "Sato", "Marin"];
-  let emergencyCounter = 0;
   let emergencyGenerated = 0;
   const usedNames = new Set([...fixedDrivers, ...availableProspects].map(d => d.name?.toLowerCase()).filter(Boolean));
+  let nextId = nextAvailableId(fixedDrivers, availableProspects, 100000 + (newSeason * 100));
 
   const driverScore = (d) => (d.ovr * 2) + ((d.pot || d.ovr) * 0.8) + (d.pace * 2) + d.consistency + ((36 - d.age) * 0.12);
   const prospectScore = (d) => (d.ovr * 1.9) + ((d.pot || d.ovr) * 0.9) + (d.pace * 1.8) + d.consistency;
@@ -151,9 +159,8 @@ function ensureValidTeamRosters(drivers, prospects, newSeason, transitionNews = 
   const bestFreeAgent = () => fixedDrivers.filter(d => d.teamId === null).sort((a, b) => driverScore(b) - driverScore(a))[0];
   const bestProspect = () => availableProspects.sort((a, b) => prospectScore(b) - prospectScore(a))[0];
   const makeEmergencyDriver = () => {
-    emergencyCounter += 1;
     return {
-      id: 100000 + (newSeason * 100) + emergencyCounter,
+      id: nextId++,
       name: generateUniqueName(usedNames, emergencyFirst, emergencyLast),
       age: pick([20, 21, 22, 23, 24]),
       ovr: pick([68, 69, 70, 71, 72, 73]),
@@ -262,6 +269,9 @@ function retirementChanceForDriver(driver, perfPts, hasSeat) {
 
   if (driver.ovr <= 78) chance += 0.08;
   if (driver.ovr <= 72) chance += 0.1;
+  if (driver.age >= 35 && driver.ovr <= 80) chance += 0.08;
+  if (driver.age >= 37 && driver.ovr <= 82) chance += 0.07;
+  if (driver.age >= 39 && driver.ovr <= 84) chance += 0.06;
   if (ovrDelta <= -2) chance += 0.07;
   if (ovrDelta <= -4) chance += 0.08;
   if (perfPts <= 10) chance += 0.07;
@@ -485,14 +495,15 @@ export default function F1Manager() {
       const perfPts = p.driverPoints[d.id] || 0;
       const pot = d.pot || Math.min(98, d.ovr + 4);
       let ovrChange = 0;
-      if (newAge <= 20) ovrChange += pick([-1, 0, 1, 2, 2, 3]);
-      else if (newAge <= 24) ovrChange += pick([-2, -1, 0, 1, 2, 2]);
+      if (newAge <= 20) ovrChange += pick([0, 1, 1, 2, 2, 3]);
+      else if (newAge <= 24) ovrChange += pick([-1, 0, 1, 1, 2, 2, 3]);
       else if (newAge <= 29) ovrChange += pick([-2, -1, 0, 0, 1, 1, 2]);
       else if (newAge <= 33) ovrChange += pick([-3, -2, -1, 0, 0, 1]);
       else ovrChange += pick([-5, -4, -3, -2, -1, 0]);
       if (pot - d.ovr >= 10 && newAge <= 25) ovrChange += maybe(0.5) ? pick([1, 2]) : 0;
-      if (newAge <= 23 && pot >= 92) ovrChange += maybe(0.34) ? pick([2, 3]) : 0;
-      else if (newAge <= 25 && pot >= 88) ovrChange += maybe(0.22) ? 1 : 0;
+      if (newAge <= 23 && pot >= 90) ovrChange += maybe(0.42) ? pick([2, 3]) : 0;
+      else if (newAge <= 25 && pot >= 86) ovrChange += maybe(0.3) ? pick([1, 2]) : 0;
+      if (newAge <= 22 && d.ovr <= 79 && pot >= 84 && maybe(0.38)) ovrChange += pick([1, 2]);
       if (pot - d.ovr <= 2 && newAge <= 25) ovrChange += maybe(0.3) ? -1 : 0;
       if (d.ovr >= 94) ovrChange += pick([-4, -3, -2, -2, -1, 0]);
       if (d.ovr >= 94 && newAge >= 27 && maybe(0.45)) ovrChange -= 1;
@@ -507,10 +518,10 @@ export default function F1Manager() {
       else if (perfPts <= 3 && newAge >= 30) ovrChange -= 2;
       else if (perfPts <= 10 && newAge >= 30) ovrChange -= 1;
       if (d.ovr >= 86 && perfPts < 70 && maybe(0.25)) ovrChange -= 1;
-      if (newAge >= 23 && newAge <= 31 && pot >= 84 && d.ovr <= 87 && maybe(0.16)) ovrChange += 1;
+      if (newAge >= 22 && newAge <= 30 && pot >= 84 && d.ovr <= 88 && maybe(0.22)) ovrChange += 1;
       if (d.ovr >= 80 && d.ovr <= 82 && perfPts >= 45 && maybe(0.32)) ovrChange += 1;
       if (d.ovr >= 83 && d.ovr <= 85 && perfPts >= 35 && maybe(0.22)) ovrChange += 1;
-      if (newAge <= 24 && pot >= 90 && d.ovr <= 87 && maybe(0.16)) ovrChange += pick([1, 2]);
+      if (newAge <= 24 && pot >= 88 && d.ovr <= 87 && maybe(0.24)) ovrChange += pick([1, 2]);
       if (newAge >= 31 && maybe(0.2)) ovrChange -= pick([1, 2]);
       if (newAge >= 34 && maybe(0.3)) ovrChange -= pick([1, 2]);
       if (newAge >= 37 && maybe(0.35)) ovrChange -= pick([1, 2, 3]);
@@ -559,19 +570,20 @@ export default function F1Manager() {
     const firstNames = ["Lucas", "Tom", "Kacper", "Yuto", "Matteo", "Elias", "Hugo", "Nils", "Sami", "Noah", "André", "Finn", "Oscar", "Kai", "Leo", "Max", "Ravi", "Cillian", "Theo", "Ivan", "Milo", "Jakub", "Enzo", "Dani", "Riku", "Nico", "Ari", "Lorenzo"];
     const lastNames = ["Martín", "Verschoor", "Nowak", "Tanaka", "Rossi", "Berger", "Petit", "Stenberg", "Al Khatib", "Carlsen", "Silva", "McCarthy", "Lindqvist", "Taniguchi", "Fernández", "Schultz", "Patel", "Byrne", "Vasseur", "Petrov", "Costa", "Bauer", "Marin", "Khan", "Sato", "Meyer"];
     const usedGeneratedNames = new Set([...p.drivers, ...p.prospects].map(d => d.name?.toLowerCase()).filter(Boolean));
+    let nextProspectId = nextAvailableId(processedDrivers, refreshedProspects, 2000 + newSeason);
     const freshProspects = Array.from({ length: 8 }, (_, i) => {
       const isF3 = i < 3;
       const isReserve = i >= 5;
-      const isEliteProspect = i === 0 ? maybe(0.4) : maybe(0.2);
+      const isEliteProspect = i === 0 ? maybe(0.3) : maybe(0.12);
       const baseAge = isF3 ? 18 : isReserve ? pick([24, 25, 26, 31]) : 19;
       const series = isF3 ? "F3" : isReserve ? pick(["Reserve", "Veteran", "Free Agent"]) : "F2";
       const baseOvr = isEliteProspect
-        ? pick([76, 76, 77, 77, 78, 78, 79, 79, 80])
-        : isF3 ? 60 + Math.floor(Math.random() * 7) : isReserve ? 70 + Math.floor(Math.random() * 8) : 63 + Math.floor(Math.random() * 9);
+        ? pick([74, 75, 76, 77, 77, 78, 79])
+        : isF3 ? 60 + Math.floor(Math.random() * 7) : isReserve ? 68 + Math.floor(Math.random() * 8) : 62 + Math.floor(Math.random() * 9);
       const potBase = isEliteProspect ? pick([92, 93, 94, 95, 96]) : (isReserve ? 6 : 12) + Math.floor(Math.random() * 8);
       const pot = isEliteProspect ? Math.min(98, potBase + Math.floor(Math.random() * 2)) : Math.min(96, baseOvr + potBase);
-      const readyNudge = isEliteProspect && maybe(0.25) ? 1 : 0;
-      return { name: generateUniqueName(usedGeneratedNames, firstNames, lastNames), age: baseAge, ovr: baseOvr + readyNudge, pace: pick([3, 4, 4, 5]), consistency: pick([2, 3, 4, 4]), wet: pick([2, 3, 4]), series, salary: Math.max(1, Math.round(baseOvr / 28)), pot, id: 200 + newSeason * 10 + i + Math.floor(Math.random() * 500), teamId: null, contractEnd: null };
+      const readyNudge = isEliteProspect && maybe(0.2) ? 1 : 0;
+      return { name: generateUniqueName(usedGeneratedNames, firstNames, lastNames), age: baseAge, ovr: baseOvr + readyNudge, pace: pick([3, 4, 4, 5]), consistency: pick([2, 3, 4, 4]), wet: pick([2, 3, 4]), series, salary: Math.max(1, Math.round(baseOvr / 28)), pot, id: nextProspectId++, teamId: null, contractEnd: null };
     });
     const allProspects = [...refreshedProspects, ...freshProspects];
 
