@@ -582,9 +582,13 @@ export default function F1Manager() {
       const idn = TEAM_IDENTITIES[t.id] || { dev: 0.55, talent: 0.5, volatility: 0.5, focus: "aero" };
       const oldProfile = prevProfiles[t.id] || { aero: t.car, power: t.car, grip: t.car - 1, tyreWear: t.car - 2, reliability: t.car - 1, overall: t.car };
       const tCPos = cStandings.findIndex(s => s.team?.id === t.id) + 1;
-      const finishBonus = tCPos > 0 ? (12 - tCPos) * 0.12 : 0;
-      const catchup = (81 - oldProfile.overall) * 0.1 + (oldProfile.overall < 76 ? 1.0 : oldProfile.overall < 80 ? 0.55 : 0);
+      const finishBonus = tCPos > 0 ? (12 - tCPos) * 0.08 : 0;
+      const rankRecoveryBoost = tCPos >= 10 ? 0.95 : tCPos >= 8 ? 0.6 : tCPos >= 6 ? 0.3 : 0;
+      const catchup = (82 - oldProfile.overall) * 0.13
+        + (oldProfile.overall < 74 ? 1.25 : oldProfile.overall < 78 ? 0.85 : oldProfile.overall < 82 ? 0.45 : 0);
+      const bottomEndBoost = oldProfile.overall <= 74 ? 1.1 : oldProfile.overall <= 78 ? 0.75 : oldProfile.overall <= 82 ? 0.35 : 0;
       const elitePenalty = oldProfile.overall >= 94 ? 2.8 : oldProfile.overall >= 92 ? 2.25 : oldProfile.overall >= 88 ? 1.35 : oldProfile.overall >= 84 ? 0.55 : 0;
+      const topTeamDrag = ["mclaren", "mercedes", "ferrari", "redbull"].includes(t.id) ? 0.25 : 0;
       const eliteStallRisk = oldProfile.overall >= 92 ? 0.22 : oldProfile.overall >= 89 ? 0.12 : 0.04;
       const conceptRoll = Math.random();
       const conceptDelta = conceptRoll < (0.18 + eliteStallRisk)
@@ -600,7 +604,17 @@ export default function F1Manager() {
         const focusBonus = attr === idn.focus ? 0.8 : 0;
         const rnd = (Math.random() - 0.5) * (2.6 + idn.volatility * 2.6);
         const executionRisk = maybe(0.22 + (1 - idn.dev) * 0.2) ? -pick([1, 2, 3]) : 0;
-        const delta = conceptDelta + (idn.dev * 0.75) + finishBonus + (catchup * 1.2) + focusBonus + rnd + executionRisk - elitePenalty;
+        const delta = conceptDelta
+          + (idn.dev * 0.75)
+          + finishBonus
+          + rankRecoveryBoost
+          + (catchup * 1.2)
+          + bottomEndBoost
+          + focusBonus
+          + rnd
+          + executionRisk
+          - elitePenalty
+          - topTeamDrag;
         evolved[attr] = Math.max(CAR_ATTR_FLOOR, Math.min(99, Math.round((oldProfile[attr] ?? oldProfile.overall) + delta)));
       });
       evolved.overall = Math.max(CAR_OVERALL_FLOOR, Math.round((evolved.aero + evolved.power + evolved.grip + evolved.tyreWear + evolved.reliability) / 5));

@@ -367,8 +367,10 @@ function aiTransfers(drivers, prospects, teamId, newSeason, transitionNews, driv
     if (lineup.length > 0) {
       const cutLine = carNow >= 92 ? 83 : carNow >= 88 ? 81 : carNow >= 82 ? 79 : 77;
       const replaceable = [...lineup].sort((a, b) => driverValue(a) - driverValue(b)).filter(d => d.ovr < cutLine || (d.ovr < 80 && (d.lowOvrSeasons || 0) >= 1) || ((d.lowOvrSeasons || 0) >= 2));
-      const replaceChance = carNow >= 90 ? 0.8 : carNow >= 84 ? 0.55 : 0.35;
-      if (replaceable[0] && maybe(replaceChance)) {
+      const lowestIncumbent = replaceable[0];
+      const forceReplace = lowestIncumbent && (lowestIncumbent.ovr < 70 || (lowestIncumbent.ovr < 75 && (lowestIncumbent.lowOvrSeasons || 0) >= 1));
+      const replaceChance = forceReplace ? 0.98 : (carNow >= 90 ? 0.85 : carNow >= 84 ? 0.6 : 0.42);
+      if (lowestIncumbent && maybe(replaceChance)) {
         const idx = updatedDrivers.findIndex(x => x.id === replaceable[0].id);
         if (idx >= 0) {
           updatedDrivers[idx] = { ...updatedDrivers[idx], teamId: null, contractEnd: null };
@@ -416,20 +418,21 @@ function aiTransfers(drivers, prospects, teamId, newSeason, transitionNews, driv
       const marketPull = Math.max(0, replacementGap - 2);
       const ambitionMismatch = carNow <= 79 && d.ovr >= 86 ? 0.08 : carNow <= 82 && d.ovr >= 88 ? 0.05 : 0;
       const carUpgradeExpendable = carNow >= 90 && d.ovr <= 82 && replacementGap > 2;
-      let resignChance = 0.64 + continuityBonus;
-      if (value >= threshold) resignChance += 0.2;
+      let resignChance = 0.56 + continuityBonus;
+      if (value >= threshold) resignChance += 0.18;
       if (perfPts >= 100) resignChance += 0.15;
       else if (perfPts >= 50) resignChance += 0.08;
       if (fitScore >= 2) resignChance += 0.08;
-      if (replacementGap > 6) resignChance -= 0.16;
-      if (marketPull > 0) resignChance -= Math.min(0.14, marketPull * 0.02);
-      if (salaryMismatch > 0) resignChance -= Math.min(0.12, salaryMismatch * 0.03);
-      if (ambitionMismatch > 0) resignChance -= ambitionMismatch;
-      if (carUpgradeExpendable) resignChance -= 0.1;
-      if (d.ovr < 80) resignChance -= (d.lowOvrSeasons || 0) >= 2 ? 0.38 : 0.16;
+      if (replacementGap > 6) resignChance -= 0.2;
+      if (marketPull > 0) resignChance -= Math.min(0.2, marketPull * 0.03);
+      if (salaryMismatch > 0) resignChance -= Math.min(0.18, salaryMismatch * 0.04);
+      if (ambitionMismatch > 0) resignChance -= ambitionMismatch + 0.03;
+      if (carUpgradeExpendable) resignChance -= 0.14;
+      if (d.ovr < 80) resignChance -= (d.lowOvrSeasons || 0) >= 2 ? 0.45 : 0.2;
+      if (d.ovr < 75) resignChance -= 0.24;
       if (decline <= -2) resignChance -= 0.12;
-      if (decline <= -4 && d.age >= 34) resignChance -= 0.3;
-      if (carNow >= 90 && d.ovr < 82) resignChance -= 0.14;
+      if (decline <= -4 && d.age >= 34) resignChance -= 0.36;
+      if (carNow >= 90 && d.ovr < 82) resignChance -= 0.17;
       resignChance = Math.max(0.05, Math.min(0.95, resignChance));
       const shouldResign = maybe(resignChance) || value >= threshold + 7;
       if (shouldResign) {
